@@ -6,7 +6,7 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    BadSyntax { line: u32, message: String }
+    BadSyntax { line: usize, message: String },
 }
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn bad_syntax<S: Into<String>>(line: u32, message: S) -> Error {
+    pub fn bad_syntax<S: Into<String>>(line: usize, message: S) -> Error {
         let kind = ErrorKind::BadSyntax { line, message: message.into() };
         Error { kind }
     }

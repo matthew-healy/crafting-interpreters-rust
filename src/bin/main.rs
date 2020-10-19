@@ -29,7 +29,7 @@ fn main() {
 
 fn run_file(path: &str) -> io::Result<()> {
     let contents = std::fs::read_to_string(path)?;
-    run(contents)
+    run(contents.as_str())
  }
 
 fn run_prompt() -> io::Result<()> {
@@ -47,7 +47,7 @@ fn run_prompt() -> io::Result<()> {
         let num_bytes = stdin.read_line(&mut buffer)?;
         if num_bytes == 0 { break };
 
-        if let Err(e) = run(buffer.clone()) {
+        if let Err(e) = run(buffer.as_str()) {
             writeln!(stderr, "{}", e)?;
         }
     }
@@ -55,7 +55,7 @@ fn run_prompt() -> io::Result<()> {
     Ok(())
 }
 
-fn run(source: String) -> io::Result<()> {
+fn run(source: &str) -> io::Result<()> {
     let scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens()?;
 
