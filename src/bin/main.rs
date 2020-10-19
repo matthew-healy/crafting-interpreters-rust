@@ -1,34 +1,42 @@
+use lox_rs::Scanner;
 use std::{
     env,
     io::{self, Write},
 };
 
-fn main() -> io::Result<()> {
+fn main() {
     let mut stdout = io::stdout();
+    let mut stderr = io::stderr();
 
     let args: Vec<String> = env::args().collect();
-    match args.len() {
-        1 => run_prompt()?,
-        2 => run_file(args[1].as_str())?,
+    let result = match args.len() {
+        1 => run_prompt(),
+        2 => run_file(args[1].as_str()),
         _ => {
-            writeln!(&mut stdout, "Usage: rlox [script]")?;
+            writeln!(stdout, "Usage: rlox [script]").expect("Something went wrong");
             std::process::exit(64);
         },
     };
 
-    Ok(())
+    match result {
+        Err(e) => {
+            writeln!(stderr, "{}", e).expect("Something went wrong");
+            std::process::exit(65);
+        },
+        Ok(()) => return,
+    }
 }
 
 fn run_file(path: &str) -> io::Result<()> {
     let contents = std::fs::read_to_string(path)?;
-    run(contents);
-    Ok(())
-}
+    run(contents)
+ }
 
 fn run_prompt() -> io::Result<()> {
     let mut buffer = String::new();
     let stdin = io::stdin();
     let mut stdout = io::stdout();
+    let mut stderr = io::stderr();
 
     loop {
         write!(stdout, "> ")?;
@@ -39,12 +47,21 @@ fn run_prompt() -> io::Result<()> {
         let num_bytes = stdin.read_line(&mut buffer)?;
         if num_bytes == 0 { break };
 
-        run(buffer.clone());
+        if let Err(e) = run(buffer.clone()) {
+            writeln!(stderr, "{}", e)?;
+        }
     }
 
     Ok(())
 }
 
-fn run(_program: String) {
+fn run(source: String) -> io::Result<()> {
+    let scanner = Scanner::new(source);
+    let tokens = scanner.scan_tokens()?;
 
+    for token in tokens.iter() {
+        println!("{:?}", token);
+    }
+
+    Ok(())
 }
