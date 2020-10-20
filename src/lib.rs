@@ -98,6 +98,12 @@ impl <'a> Scanner<'a> {
                 if self.does_next_match('/') { // is this a comment?
                     self.advance_until_match('\n');
                     None
+                } else if self.does_next_match('*') {
+                    while self.src.next() != Some('*') && self.src.peek() != Some(&'/') {
+                        self.src.next();
+                    }
+                    self.src.next();
+                    None
                 } else {
                     Some(Ok(Slash))
                 }
