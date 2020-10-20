@@ -10,6 +10,28 @@ pub struct Scanner<'a> {
     line: usize,
 }
 
+impl <'a> Iterator for Scanner<'a> {
+    type Item = Result<Token>;
+
+    fn next(&mut self) -> Option<Result<Token>> {
+        let next_char = self.src.next()?;
+        self.lexeme_buffer.push(next_char);
+
+        let kind = self.token_kind_from_char(next_char);
+
+        let lexeme = self.lexeme_buffer.clone();
+        self.lexeme_buffer.clear();
+
+        kind.map(|kind|
+            kind.map(|kind| Token {
+                kind,
+                lexeme,
+                line: self.line,
+            })
+        ).or_else(|| self.next())
+    }
+}
+
 impl <'a> Scanner<'a> {
     pub fn new(src: &'a str) -> Self {
         Self {
@@ -41,7 +63,7 @@ impl <'a> Scanner<'a> {
             '<' => Some(Ok(if self.does_next_match('=') { LessEqual } else { Less })),
             '>' => Some(Ok(if self.does_next_match('=') { GreaterEqual } else { Greater })),
             '/' => {
-                if self.does_next_match('/') {
+                if self.does_next_match('/') { // is this a comment?
                     self.consume_until('\n');
                     None
                 } else {
@@ -52,7 +74,8 @@ impl <'a> Scanner<'a> {
             '\n' => {
                 self.line += 1;
                 None
-            }
+            },
+            '"' => Some(self.extract_string()),
             _ => Some(Err(Error::bad_syntax(self.line, format!("Unexpected character '{}'", c)))),
         }
     }
@@ -67,33 +90,30 @@ impl <'a> Scanner<'a> {
         }
     }
 
-    fn consume_until(&mut self, c: char) {
-        let is_done = |nxt: Option<&char>| nxt.is_none() || nxt == Some(&c);
-        while !is_done(self.src.peek()) {
-            self.src.next();
+    fn extract_string(&mut self) -> Result<TokenKind> {
+        let mut newline_count = 0;
+        self.iterate_until('"', |c| if c == '\n' { newline_count += 1 });
+        self.line += newline_count;
+        match self.src.next() {
+            None => Err(Error::bad_syntax(self.line, "Unterminated string literal.")),
+            Some(q) => { // q here must be " due to iterate_until
+                self.lexeme_buffer.push(q);
+                Ok(TokenKind::String(self.lexeme_buffer.trim_matches('"').to_string()))
+            },
         }
     }
-}
 
-impl <'a> Iterator for Scanner<'a> {
-    type Item = Result<Token>;
+    fn consume_until(&mut self, c: char) {
+        self.iterate_until(c, |_| {})
+    }
 
-    fn next(&mut self) -> Option<Result<Token>> {
-        let next_char = self.src.next()?;
-        self.lexeme_buffer.push(next_char);
-
-        let kind = self.token_kind_from_char(next_char);
-
-        let lexeme = self.lexeme_buffer.clone();
-        self.lexeme_buffer.clear();
-
-        kind.map(|kind|
-            kind.map(|kind| Token {
-                kind,
-                lexeme,
-                line: self.line,
-            })
-        ).or_else(|| self.next())
+    fn iterate_until(&mut self, c: char, mut f: impl FnMut(char) -> ()) {
+        let is_done = |nxt: Option<&char>| nxt.is_none() || nxt == Some(&c);
+        while !is_done(self.src.peek()) {
+            let next = self.src.next().unwrap();
+            self.lexeme_buffer.push(next);
+            f(next);
+        }
     }
 }
 
@@ -114,7 +134,7 @@ enum TokenKind {
     Greater, GreaterEqual,
     Less, LessEqual,
 
-    Identifier, String, Number,
+    Identifier, String(String), Number,
 
     And, Class, Else, False, Fun, For, If, Nil, Or,
     Print, Return, Super, This, True, Var, While,
