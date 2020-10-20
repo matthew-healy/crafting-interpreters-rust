@@ -2,10 +2,11 @@ mod error;
 
 pub use crate::error::{Error, Result};
 
-use std::{iter::Peekable, str::Chars};
+use std::{str::Chars};
+use peekmore::{PeekMore, PeekMoreIterator};
 
 pub struct Scanner<'a> {
-    src: Peekable<Chars<'a>>,
+    src: PeekMoreIterator<Chars<'a>>,
     lexeme_buffer: String,
     line: usize,
 }
@@ -35,7 +36,7 @@ impl <'a> Iterator for Scanner<'a> {
 impl <'a> Scanner<'a> {
     pub fn new(src: &'a str) -> Self {
         Self {
-            src: src.chars().peekable(),
+            src: src.chars().peekmore(),
             lexeme_buffer: String::new(),
             line: 1,
         }
@@ -64,7 +65,7 @@ impl <'a> Scanner<'a> {
             '>' => Some(Ok(if self.does_next_match('=') { GreaterEqual } else { Greater })),
             '/' => {
                 if self.does_next_match('/') { // is this a comment?
-                    self.consume_until('\n');
+                    self.advance_until_match('\n');
                     None
                 } else {
                     Some(Ok(Slash))
@@ -76,6 +77,7 @@ impl <'a> Scanner<'a> {
                 None
             },
             '"' => Some(self.extract_string()),
+            _ if c.is_digit(10) => Some(self.extract_number()),
             _ => Some(Err(Error::bad_syntax(self.line, format!("Unexpected character '{}'", c)))),
         }
     }
@@ -92,7 +94,7 @@ impl <'a> Scanner<'a> {
 
     fn extract_string(&mut self) -> Result<TokenKind> {
         let mut newline_count = 0;
-        self.iterate_until('"', |c| if c == '\n' { newline_count += 1 });
+        self.advance_until_match_for_each('"', |c| if c == '\n' { newline_count += 1 });
         self.line += newline_count;
         match self.src.next() {
             None => Err(Error::bad_syntax(self.line, "Unterminated string literal.")),
@@ -103,12 +105,41 @@ impl <'a> Scanner<'a> {
         }
     }
 
-    fn consume_until(&mut self, c: char) {
-        self.iterate_until(c, |_| {})
+    fn extract_number(&mut self) -> Result<TokenKind> {
+        self.advance_until(|n| !n.is_digit(10));
+
+        if let Some(&'.') = self.src.peek() {
+            if let Some(maybe_digit) = self.src.peek_next() {
+                if maybe_digit.is_digit(10) {
+                    self.lexeme_buffer.push(self.src.next().unwrap());
+                    self.advance_until(|n| !n.is_digit(10));
+                }
+            }
+        }
+
+        match self.lexeme_buffer.parse() {
+            Ok(number) => Ok(TokenKind::Number(number)),
+            Err(_) => Err(Error::bad_syntax(
+                self.line,
+                format!("Could not convert {} into a number", self.lexeme_buffer.clone())
+            )),
+        }
     }
 
-    fn iterate_until(&mut self, c: char, mut f: impl FnMut(char) -> ()) {
-        let is_done = |nxt: Option<&char>| nxt.is_none() || nxt == Some(&c);
+    fn advance_until_match(&mut self, c: char) {
+        self.advance_until(|n| n == &c)
+    }
+
+    fn advance_until(&mut self, should_stop: impl Fn(&char) -> bool) {
+        self.advance_until_for_each(should_stop, |_| {})
+    }
+
+    fn advance_until_match_for_each(&mut self, c: char, f: impl FnMut(char) -> ()) {
+        self.advance_until_for_each(|n| n == &c, f);
+    }
+
+    fn advance_until_for_each(&mut self, should_stop: impl Fn(&char) -> bool, mut f: impl FnMut(char) -> ()) {
+        let is_done = |nxt: Option<&char>| nxt.is_none() || should_stop(nxt.unwrap());
         while !is_done(self.src.peek()) {
             let next = self.src.next().unwrap();
             self.lexeme_buffer.push(next);
@@ -134,7 +165,7 @@ enum TokenKind {
     Greater, GreaterEqual,
     Less, LessEqual,
 
-    Identifier, String(String), Number,
+    Identifier, String(String), Number(f64),
 
     And, Class, Else, False, Fun, For, If, Nil, Or,
     Print, Return, Super, This, True, Var, While,
