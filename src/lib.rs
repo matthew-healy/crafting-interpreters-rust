@@ -1,9 +1,33 @@
 mod error;
+mod token;
 
-pub use crate::error::{Error, Result};
+pub use crate::{
+    error::{Error, Result},
+    token::{Token, TokenKind},
+};
 
-use std::{str::Chars};
 use peekmore::{PeekMore, PeekMoreIterator};
+use phf::phf_map;
+use std::str::Chars;
+
+static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
+    "and" => TokenKind::And,
+    "class" => TokenKind::Class,
+    "else" => TokenKind::Else,
+    "false" => TokenKind::False,
+    "for" => TokenKind::For,
+    "fun" => TokenKind::Fun,
+    "if" => TokenKind::If,
+    "nil" => TokenKind::Nil,
+    "or" => TokenKind::Or,
+    "print" => TokenKind::Print,
+    "return" => TokenKind::Return,
+    "super" => TokenKind::Super,
+    "this" => TokenKind::This,
+    "true" => TokenKind::True,
+    "var" => TokenKind::Var,
+    "while" => TokenKind::While,
+};
 
 pub struct Scanner<'a> {
     src: PeekMoreIterator<Chars<'a>>,
@@ -42,8 +66,15 @@ impl <'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_tokens(self) -> Result<Vec<Token>> {
-        self.collect()
+    pub fn scan_tokens(self) -> Vec<Result<Token>> {
+        let line = self.line;
+        let mut tokens = self.collect::<Vec<Result<Token>>>();
+        tokens.push(Ok(Token {
+            kind: TokenKind::EndOfFile,
+            lexeme: "".to_string(),
+            line: line,
+        }));
+        tokens
     }
 
     fn token_kind_from_char(&mut self, c: char) -> Option<Result<TokenKind>> {
@@ -78,6 +109,7 @@ impl <'a> Scanner<'a> {
             },
             '"' => Some(self.extract_string()),
             _ if c.is_digit(10) => Some(self.extract_number()),
+            _ if can_start_identifier(&c) => Some(self.extract_identifier()),
             _ => Some(Err(Error::bad_syntax(self.line, format!("Unexpected character '{}'", c)))),
         }
     }
@@ -118,11 +150,21 @@ impl <'a> Scanner<'a> {
         }
 
         match self.lexeme_buffer.parse() {
-            Ok(number) => Ok(TokenKind::Number(number)),
             Err(_) => Err(Error::bad_syntax(
                 self.line,
                 format!("Could not convert {} into a number", self.lexeme_buffer.clone())
             )),
+            Ok(number) => Ok(TokenKind::Number(number)),
+        }
+    }
+
+    fn extract_identifier(&mut self) -> Result<TokenKind> {
+        self.advance_until(|n| !is_part_of_valid_identifier(n));
+
+        let text = self.lexeme_buffer.as_str();
+        match KEYWORDS.get(text) {
+            Some(token) => Ok(token.clone()),
+            None => Ok(TokenKind::Identifier)
         }
     }
 
@@ -134,11 +176,19 @@ impl <'a> Scanner<'a> {
         self.advance_until_for_each(should_stop, |_| {})
     }
 
-    fn advance_until_match_for_each(&mut self, c: char, f: impl FnMut(char) -> ()) {
+    fn advance_until_match_for_each(
+        &mut self,
+        c: char,
+        f: impl FnMut(char) -> ()
+    ) {
         self.advance_until_for_each(|n| n == &c, f);
     }
 
-    fn advance_until_for_each(&mut self, should_stop: impl Fn(&char) -> bool, mut f: impl FnMut(char) -> ()) {
+    fn advance_until_for_each(
+        &mut self,
+        should_stop: impl Fn(&char) -> bool,
+        mut f: impl FnMut(char) -> ()
+    ) {
         let is_done = |nxt: Option<&char>| nxt.is_none() || should_stop(nxt.unwrap());
         while !is_done(self.src.peek()) {
             let next = self.src.next().unwrap();
@@ -148,27 +198,10 @@ impl <'a> Scanner<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct Token {
-    kind: TokenKind,
-    lexeme: String,
-    line: usize,
+fn can_start_identifier(c: &char) -> bool {
+    c.is_ascii_alphabetic() || c == &'_'
 }
 
-#[derive(Debug)]
-enum TokenKind {
-    LeftParen, RightParen, LeftBrace, RightBrace,
-    Comma, Dot, Minus, Plus, Semicolon, Slash, Star,
-
-    Bang, BangEqual,
-    Equal, EqualEqual,
-    Greater, GreaterEqual,
-    Less, LessEqual,
-
-    Identifier, String(String), Number(f64),
-
-    And, Class, Else, False, Fun, For, If, Nil, Or,
-    Print, Return, Super, This, True, Var, While,
-
-    EndOfFile,
+fn is_part_of_valid_identifier(c: &char) -> bool {
+    can_start_identifier(c) || c.is_digit(10)
 }

@@ -57,9 +57,9 @@ fn run_prompt() -> io::Result<()> {
 
 fn run(source: &str) -> io::Result<()> {
     let scanner = Scanner::new(source);
-    let tokens = scanner.scan_tokens()?;
+    let tokens_and_errors = scanner.scan_tokens();
 
-    for token in tokens.iter() {
+    for token in tokens_and_errors.iter() {
         println!("{:?}", token);
     }
 
