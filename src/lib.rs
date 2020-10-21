@@ -39,10 +39,7 @@ impl <'a> Iterator for Scanner<'a> {
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Result<Token>> {
-        let next_char = self.src.next()?;
-        self.lexeme_buffer.push(next_char);
-
-        let kind = self.token_kind_from_char(next_char);
+        let kind = self.next_token_kind();
 
         let lexeme = self.lexeme_buffer.clone();
         self.lexeme_buffer.clear();
@@ -77,9 +74,12 @@ impl <'a> Scanner<'a> {
         tokens
     }
 
-    fn token_kind_from_char(&mut self, c: char) -> Option<Result<TokenKind>> {
+    fn next_token_kind(&mut self) -> Option<Result<TokenKind>> {
+        let next_char = self.src.next()?;
+        self.lexeme_buffer.push(next_char);
+
         use TokenKind::*;
-        match c {
+        match next_char {
             '(' => Some(Ok(LeftParen)),
             ')' => Some(Ok(RightParen)),
             '{' => Some(Ok(LeftBrace)),
@@ -108,9 +108,9 @@ impl <'a> Scanner<'a> {
                 None
             },
             '"' => Some(self.extract_string()),
-            _ if c.is_digit(10) => Some(self.extract_number()),
-            _ if can_start_identifier(&c) => Some(self.extract_identifier()),
-            _ => Some(Err(Error::lexical(self.line, format!("Unexpected character '{}'", c)))),
+            c if c.is_digit(10) => Some(self.extract_number()),
+            c if can_start_identifier(&c) => Some(self.extract_identifier()),
+            c => Some(Err(Error::lexical(self.line, format!("Unexpected character '{}'", c)))),
         }
     }
 
