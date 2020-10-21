@@ -1,4 +1,5 @@
 mod error;
+mod expr;
 mod token;
 
 pub use crate::{
