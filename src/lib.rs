@@ -110,7 +110,7 @@ impl <'a> Scanner<'a> {
             '"' => Some(self.extract_string()),
             _ if c.is_digit(10) => Some(self.extract_number()),
             _ if can_start_identifier(&c) => Some(self.extract_identifier()),
-            _ => Some(Err(Error::bad_syntax(self.line, format!("Unexpected character '{}'", c)))),
+            _ => Some(Err(Error::lexical(self.line, format!("Unexpected character '{}'", c)))),
         }
     }
 
@@ -129,7 +129,7 @@ impl <'a> Scanner<'a> {
         self.advance_until_match_for_each('"', |c| if c == '\n' { newline_count += 1 });
         self.line += newline_count;
         match self.src.next() {
-            None => Err(Error::bad_syntax(self.line, "Unterminated string literal.")),
+            None => Err(Error::lexical(self.line, "Unterminated string literal.")),
             Some(q) => { // q here must be " due to iterate_until
                 self.lexeme_buffer.push(q);
                 Ok(TokenKind::String(self.lexeme_buffer.trim_matches('"').to_string()))
@@ -150,7 +150,7 @@ impl <'a> Scanner<'a> {
         }
 
         match self.lexeme_buffer.parse() {
-            Err(_) => Err(Error::bad_syntax(
+            Err(_) => Err(Error::lexical(
                 self.line,
                 format!("Could not convert {} into a number", self.lexeme_buffer.clone())
             )),

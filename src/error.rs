@@ -6,7 +6,7 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    BadSyntax { line: usize, message: String },
+    Lexical { line: usize, message: String },
 }
 
 #[derive(Debug)]
@@ -15,8 +15,8 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn bad_syntax<S: Into<String>>(line: usize, message: S) -> Error {
-        let kind = ErrorKind::BadSyntax { line, message: message.into() };
+    pub fn lexical<S: Into<String>>(line: usize, message: S) -> Error {
+        let kind = ErrorKind::Lexical { line, message: message.into() };
         Error { kind }
     }
 
@@ -31,7 +31,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use ErrorKind::*;
         match self.kind() {
-            BadSyntax { line, message } => write!(f, "[line {}] Error: {}", line, message),
+            Lexical { line, message } => write!(f, "[line {}] Error: {}", line, message),
         }
     }
 }
