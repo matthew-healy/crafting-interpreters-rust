@@ -1,4 +1,4 @@
-use lox_rs::Scanner;
+use lox_rs::scanner::Scanner;
 use std::{
     env,
     io::{self, Write},
