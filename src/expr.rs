@@ -2,13 +2,13 @@ use crate::token::Token;
 
 macro_rules! generate_ast {
     ($($typename:ident => $($propname:ident: $proptype:ty),+);+) => {
-        enum Expr {
+        pub(crate) enum Expr {
             $($typename($typename)),+
         }
 
         $(
-            struct $typename {
-                $($propname: $proptype),+
+            pub(crate) struct $typename {
+                $(pub(crate) $propname: $proptype),+
             }
         )+
     }
@@ -16,12 +16,12 @@ macro_rules! generate_ast {
 
 macro_rules! generate_visitor {
     ($($typename:ident => $visitname:ident);+) => {
-        trait Visitor<T> {
+        pub(crate) trait Visitor<T> {
             $(fn $visitname(&mut self, e: &$typename) -> T;)+
         }
 
         impl Expr {
-            fn accept<T, V: Visitor<T>>(&self, v: &mut V) -> T {
+            pub(crate) fn accept<T, V: Visitor<T>>(&self, v: &mut V) -> T {
                 match self {
                     $(Expr::$typename(a) => v.$visitname(a),)+
                 }
