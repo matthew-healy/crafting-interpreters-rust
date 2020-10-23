@@ -33,9 +33,9 @@ macro_rules! generate_visitor {
 generate_ast!(
     Binary => left: Box<Expr>, op: Token, right: Box<Expr>;
     Grouping => expression: Box<Expr>;
-    Unary => op: Token, right: Box<Expr>;
     NumberLiteral => value: f64;
-    StringLiteral => value: String
+    StringLiteral => value: String;
+    Unary => op: Token, right: Box<Expr>
 );
 
 generate_visitor!(
