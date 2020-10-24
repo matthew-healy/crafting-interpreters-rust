@@ -33,16 +33,22 @@ macro_rules! generate_visitor {
 generate_ast!(
     Binary => left: Box<Expr>, op: Token, right: Box<Expr>;
     Grouping => expression: Box<Expr>;
-    NumberLiteral => value: f64;
-    StringLiteral => value: String;
+    Literal => value: LoxLiteral;
     Unary => op: Token, right: Box<Expr>
 );
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum LoxLiteral {
+    Bool(bool),
+    Nil,
+    Number(f64),
+    String(String),
+}
 
 generate_visitor!(
     Binary => visit_binary_expr;
     Grouping => visit_grouping_expr;
-    NumberLiteral => visit_number_literal_expr;
-    StringLiteral => visit_string_literal_expr;
+    Literal => visit_literal_expr;
     Unary => visit_unary_expr
 );
 
