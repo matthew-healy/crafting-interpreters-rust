@@ -35,18 +35,18 @@ impl <'a> Iterator for Scanner<'a> {
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Result<Token>> {
-        let kind = self.next_token_kind();
+        let kind = self.next_token_kind()?;
 
         let lexeme = self.lexeme_buffer.clone();
         self.lexeme_buffer.clear();
 
-        kind.map(|kind|
-            kind.map(|kind| Token {
+        Some(kind.map(|kind|
+            Token {
                 kind,
                 lexeme,
                 line: self.line,
-            })
-        ).or_else(|| self.next())
+            }
+        ))
     }
 }
 
