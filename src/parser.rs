@@ -8,7 +8,7 @@ use crate::{
 
 const EQUALITY_TOKENS: &'static [&'static TokenKind] = &[
     &TokenKind::BangEqual, 
-    &TokenKind::Equal,
+    &TokenKind::EqualEqual,
 ];
 
 const COMPARISON_TOKENS: &'static [&'static TokenKind] = &[
