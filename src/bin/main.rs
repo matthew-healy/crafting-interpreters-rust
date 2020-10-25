@@ -1,4 +1,8 @@
-use lox_rs::scanner::Scanner;
+use lox_rs::{
+    printer,
+    scanner::Scanner,
+    parser::Parser,
+};
 use std::{
     env,
     io::{self, Write},
@@ -57,11 +61,11 @@ fn run_prompt() -> io::Result<()> {
 
 fn run(source: &str) -> io::Result<()> {
     let scanner = Scanner::new(source);
-    let tokens_and_errors = scanner.scan_tokens();
+    let tokens = scanner.into_iter().filter_map(|e| e.ok() );
+    let mut parser = Parser::new(tokens);
+    let parsed = parser.parse()?;
 
-    for token in tokens_and_errors.iter() {
-        println!("{:?}", token);
-    }
+    println!("{}", printer::print(&parsed));
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 mod error;
 mod expr;
-mod printer;
+pub mod parser;
+pub mod printer;
 pub mod scanner;
 mod token;

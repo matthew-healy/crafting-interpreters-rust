@@ -1,11 +1,11 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub(crate) kind: TokenKind,
     pub(crate) lexeme: String,
     pub(crate) line: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
     LeftParen, RightParen, LeftBrace, RightBrace,
     Comma, Dot, Minus, Plus, Semicolon, Slash, Star,

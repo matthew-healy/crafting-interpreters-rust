@@ -1,6 +1,6 @@
 use crate::expr::{self, Expr, LoxLiteral};
 
-fn print(e: &Expr) -> String {
+pub fn print(e: &Expr) -> String {
     let mut printer = AstPrinter {};
     e.accept(&mut printer)
 }

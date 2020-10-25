@@ -25,6 +25,12 @@ static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
     "while" => TokenKind::While,
 };
 
+enum ScannerResult {
+    Next(Result<TokenKind>),
+    Skip,
+    NoMoreTokens,
+}
+
 pub struct Scanner<'a> {
     src: PeekMoreIterator<Chars<'a>>,
     lexeme_buffer: String,
@@ -35,18 +41,24 @@ impl <'a> Iterator for Scanner<'a> {
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Result<Token>> {
-        let kind = self.next_token_kind()?;
+        let next = self.next_token_kind();
 
         let lexeme = self.lexeme_buffer.clone();
         self.lexeme_buffer.clear();
 
-        Some(kind.map(|kind|
-            Token {
-                kind,
-                lexeme,
-                line: self.line,
-            }
-        ))
+        match next {
+            ScannerResult::Next(result) => {
+                Some(result.map(|kind|
+                    Token {
+                        kind,
+                        lexeme,
+                        line: self.line,
+                    }
+                ))
+            },
+            ScannerResult::Skip => self.next(),
+            ScannerResult::NoMoreTokens => None,
+        }
     }
 }
 
@@ -70,43 +82,46 @@ impl <'a> Scanner<'a> {
         tokens
     }
 
-    fn next_token_kind(&mut self) -> Option<Result<TokenKind>> {
-        let next_char = self.src.next()?;
-        self.lexeme_buffer.push(next_char);
-
-        use TokenKind::*;
-        match next_char {
-            '(' => Some(Ok(LeftParen)),
-            ')' => Some(Ok(RightParen)),
-            '{' => Some(Ok(LeftBrace)),
-            '}' => Some(Ok(RightBrace)),
-            ',' => Some(Ok(Comma)),
-            '.' => Some(Ok(Dot)),
-            '-' => Some(Ok(Minus)),
-            '+' => Some(Ok(Plus)),
-            ';' => Some(Ok(Semicolon)),
-            '*' => Some(Ok(Star)),
-            '!' => Some(Ok(if self.does_next_match('=') { BangEqual } else { Bang })),
-            '=' => Some(Ok(if self.does_next_match('=') { EqualEqual } else { Equal })),
-            '<' => Some(Ok(if self.does_next_match('=') { LessEqual } else { Less })),
-            '>' => Some(Ok(if self.does_next_match('=') { GreaterEqual } else { Greater })),
-            '/' => {
-                if self.does_next_match('/') { // is this a comment?
-                    self.advance_until_match('\n');
-                    None
-                } else {
-                    Some(Ok(Slash))
+    fn next_token_kind(&mut self) -> ScannerResult {
+        match self.src.next() {
+            None => ScannerResult::NoMoreTokens,
+            Some(next_char) => {
+                self.lexeme_buffer.push(next_char);
+                use TokenKind::*;
+                match next_char {
+                    '(' => ScannerResult::Next(Ok(LeftParen)),
+                    ')' => ScannerResult::Next(Ok(RightParen)),
+                    '{' => ScannerResult::Next(Ok(LeftBrace)),
+                    '}' => ScannerResult::Next(Ok(RightBrace)),
+                    ',' => ScannerResult::Next(Ok(Comma)),
+                    '.' => ScannerResult::Next(Ok(Dot)),
+                    '-' => ScannerResult::Next(Ok(Minus)),
+                    '+' => ScannerResult::Next(Ok(Plus)),
+                    ';' => ScannerResult::Next(Ok(Semicolon)),
+                    '*' => ScannerResult::Next(Ok(Star)),
+                    '!' => ScannerResult::Next(Ok(if self.does_next_match('=') { BangEqual } else { Bang })),
+                    '=' => ScannerResult::Next(Ok(if self.does_next_match('=') { EqualEqual } else { Equal })),
+                    '<' => ScannerResult::Next(Ok(if self.does_next_match('=') { LessEqual } else { Less })),
+                    '>' => ScannerResult::Next(Ok(if self.does_next_match('=') { GreaterEqual } else { Greater })),
+                    '/' => {
+                        if self.does_next_match('/') { // is this a comment?
+                            self.advance_until_match('\n');
+                            ScannerResult::Skip
+                        } else {
+                            ScannerResult::Next(Ok(Slash))
+                        }
+                    },
+                    ' ' | '\r' | '\t' => ScannerResult::Skip,
+                    '\n' => {
+                        self.line += 1;
+                        ScannerResult::Skip
+                    },
+                    '"' => ScannerResult::Next(self.extract_string()),
+                    c if c.is_digit(10) => ScannerResult::Next(self.extract_number()),
+                    c if can_start_identifier(&c) => ScannerResult::Next(self.extract_identifier()),
+                    c => ScannerResult::Next(Err(Error::lexical(self.line, format!("Unexpected character '{}'", c)))),
                 }
-            },
-            ' ' | '\r' | '\t' => None,
-            '\n' => {
-                self.line += 1;
-                None
-            },
-            '"' => Some(self.extract_string()),
-            c if c.is_digit(10) => Some(self.extract_number()),
-            c if can_start_identifier(&c) => Some(self.extract_identifier()),
-            c => Some(Err(Error::lexical(self.line, format!("Unexpected character '{}'", c)))),
+            }
         }
     }
 

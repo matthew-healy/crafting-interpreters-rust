@@ -2,12 +2,14 @@ use crate::token::Token;
 
 macro_rules! generate_ast {
     ($($typename:ident => $($propname:ident: $proptype:ty),+);+) => {
-        pub(crate) enum Expr {
+        #[derive(Debug, PartialEq)]
+        pub enum Expr {
             $($typename($typename)),+
         }
 
         $(
-            pub(crate) struct $typename {
+            #[derive(Debug, PartialEq)]
+            pub struct $typename {
                 $(pub(crate) $propname: $proptype),+
             }
         )+
