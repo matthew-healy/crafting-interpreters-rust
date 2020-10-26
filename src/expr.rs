@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::token::Token;
 
 macro_rules! generate_ast {
@@ -45,6 +46,30 @@ pub(crate) enum LoxLiteral {
     Nil,
     Number(f64),
     String(String),
+}
+
+impl From<bool> for LoxLiteral {
+    fn from(b: bool) -> Self {
+        LoxLiteral::Bool(b)
+    }
+}
+
+impl From<f64> for LoxLiteral {
+    fn from(n: f64) -> Self {
+        LoxLiteral::Number(n)
+    }
+}
+
+impl Display for LoxLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use LoxLiteral::*;
+        match self {
+            Bool(b) => write!(f, "{}", b),
+            Nil => write!(f, "nil"),
+            Number(n) => write!(f, "{}", n),
+            String(s) => write!(f, "{}", s),
+        }
+    }
 }
 
 generate_visitor!(

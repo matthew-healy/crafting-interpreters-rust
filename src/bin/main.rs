@@ -1,5 +1,6 @@
 use lox_rs::{
-    printer,
+    error::Result,
+    interpreter::Interpreter,
     scanner::Scanner,
     parser::Parser,
 };
@@ -25,18 +26,22 @@ fn main() {
     match result {
         Err(e) => {
             writeln!(stderr, "{}", e).expect("Something went wrong");
-            std::process::exit(65);
+            if e.is_runtime_error() {
+                std::process::exit(70);
+            } else {
+                std::process::exit(65);
+            }
         },
         Ok(()) => return,
     }
 }
 
-fn run_file(path: &str) -> io::Result<()> {
+fn run_file(path: &str) -> Result<()> {
     let contents = std::fs::read_to_string(path)?;
     run(contents.as_str())
  }
 
-fn run_prompt() -> io::Result<()> {
+fn run_prompt() -> Result<()> {
     let mut buffer = String::new();
     let stdin = io::stdin();
     let mut stdout = io::stdout();
@@ -59,13 +64,14 @@ fn run_prompt() -> io::Result<()> {
     Ok(())
 }
 
-fn run(source: &str) -> io::Result<()> {
+fn run(source: &str) -> Result<()> {
     let scanner = Scanner::new(source);
     let tokens = scanner.into_iter().filter_map(|e| e.ok() );
     let mut parser = Parser::new(tokens);
     let parsed = parser.parse()?;
 
-    println!("{}", printer::print(&parsed));
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret(&mut std::io::stdout(), &parsed)?;
 
     Ok(())
 }
