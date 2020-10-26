@@ -4,9 +4,9 @@ use crate::{
     error::{Error, Result},
     expr::{self, Expr},
     token::{TokenKind, Token},
+    value::Value,
 };
 
-type LoxValue = expr::LoxLiteral;
 
 pub struct Interpreter;
 
@@ -22,18 +22,18 @@ impl Interpreter {
             )
     }
     
-    fn evaluate(&mut self, e: &Expr) -> Result<LoxValue> {
+    fn evaluate(&mut self, e: &Expr) -> Result<Value> {
         e.accept(self)
     }
 }
 
-impl expr::Visitor<Result<LoxValue>> for Interpreter {
-    fn visit_binary_expr(&mut self, e: &expr::Binary) -> Result<LoxValue> {
+impl expr::Visitor<Result<Value>> for Interpreter {
+    fn visit_binary_expr(&mut self, e: &expr::Binary) -> Result<Value> {
         let left = self.evaluate(e.left.as_ref())?;
         let right = self.evaluate(e.right.as_ref())?;
         let kind = e.op.kind.clone();
 
-        use expr::LoxLiteral::{Number, String, Bool};
+        use Value::{Number, String, Bool};
         match kind {
             TokenKind::Minus => compute_if_numbers(&e.op, left, right, |l, r| l - r),
             TokenKind::Plus => {
@@ -62,19 +62,19 @@ impl expr::Visitor<Result<LoxValue>> for Interpreter {
         }
     }
 
-    fn visit_grouping_expr(&mut self, e: &expr::Grouping) -> Result<LoxValue> {
+    fn visit_grouping_expr(&mut self, e: &expr::Grouping) -> Result<Value> {
         self.evaluate(&e.expression)
     }
 
-    fn visit_literal_expr(&mut self, e: &expr::Literal) -> Result<LoxValue> {
+    fn visit_literal_expr(&mut self, e: &expr::Literal) -> Result<Value> {
         Ok(e.value.clone())
     }
 
-    fn visit_unary_expr(&mut self, e: &expr::Unary) -> Result<LoxValue> {
+    fn visit_unary_expr(&mut self, e: &expr::Unary) -> Result<Value> {
         let right = self.evaluate(e.right.as_ref())?;
         let kind = e.op.kind.clone();
 
-        use expr::LoxLiteral::*;
+        use Value::*;
         match (kind, right) {
             (TokenKind::Minus, Number(right)) => Ok(Number(-right)),
             (TokenKind::Minus, _) => Err(Error::runtime(e.op.clone(), "Operand must be a number.")),
@@ -84,13 +84,13 @@ impl expr::Visitor<Result<LoxValue>> for Interpreter {
     }
 }
 
-fn compute_if_numbers<T: Into<LoxValue>>(
+fn compute_if_numbers<T: Into<Value>>(
     op: &Token, 
-    left: LoxValue, 
-    right: LoxValue, 
+    left: Value,
+    right: Value,
     f: impl Fn(f64, f64) -> T
-) -> Result<LoxValue> {
-    use expr::LoxLiteral::Number;
+) -> Result<Value> {
+    use Value::Number;
     if let Number(left) = left {
         if let Number(right) = right { 
             return Ok(f(left, right).into())
@@ -99,9 +99,9 @@ fn compute_if_numbers<T: Into<LoxValue>>(
     Err(Error::runtime(op.clone(), "Operands must be numbers."))
 }
 
-impl LoxValue {
-    fn is_equal(&self, other: &expr::LoxLiteral) -> bool {
-        use expr::LoxLiteral::*;
+impl Value {
+    fn is_equal(&self, other: &Value) -> bool {
+        use Value::*;
         match (self, other) {
             (Nil, Nil) => true,
             (Bool(s), Bool(o)) => s == o,
@@ -120,7 +120,7 @@ impl LoxValue {
     }
 
     fn is_truthy(&self) -> bool {
-        use expr::LoxLiteral::*;
+        use Value::*;
         match self {
             Bool(false) | Nil => false,
             _ => true,

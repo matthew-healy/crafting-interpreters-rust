@@ -4,6 +4,7 @@ use crate::{
     error::{Error, Result},
     expr::*,
     token::*,
+    value::Value,
 };
 
 const EQUALITY_TOKENS: &'static [&'static TokenKind] = &[
@@ -96,11 +97,11 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         };
 
         match kind {
-            TokenKind::True => Ok(Expr::Literal(Literal { value: LoxLiteral::Bool(true) })),
-            TokenKind::False => Ok(Expr::Literal(Literal { value: LoxLiteral::Bool(false) })),
-            TokenKind::Nil => Ok(Expr::Literal(Literal { value: LoxLiteral::Nil })),
-            TokenKind::Number(n) => Ok(Expr::Literal(Literal { value: LoxLiteral::Number(n) })),
-            TokenKind::String(s) => Ok(Expr::Literal(Literal { value: LoxLiteral::String(s) })),
+            TokenKind::True => Ok(Expr::Literal(Literal { value: true.into() })),
+            TokenKind::False => Ok(Expr::Literal(Literal { value: false.into() })),
+            TokenKind::Nil => Ok(Expr::Literal(Literal { value: Value::Nil })),
+            TokenKind::Number(n) => Ok(Expr::Literal(Literal { value: n.into() })),
+            TokenKind::String(s) => Ok(Expr::Literal(Literal { value: Value::String(s) })),
             TokenKind::LeftParen => {
                 let expression = Box::new(self.expression()?);
                  self.consume(&TokenKind::RightParen, "Expected ')' after expression.")?;
@@ -167,7 +168,7 @@ mod tests {
             vec![
                 Token { kind: TokenKind::String("abc".into()), lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::Literal(Literal { value: LoxLiteral::String("abc".into()) })
+            Expr::Literal(Literal { value: Value::String("abc".into()) })
         )
     }
 
@@ -177,7 +178,7 @@ mod tests {
             vec![
                 Token { kind: TokenKind::Number(5.1), lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::Literal(Literal { value: LoxLiteral::Number(5.1) })
+            Expr::Literal(Literal { value: Value::Number(5.1) })
         )
     }
 
@@ -187,13 +188,13 @@ mod tests {
             vec![
                 Token { kind: TokenKind::Nil, lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::Literal(Literal { value: LoxLiteral::Nil })
+            Expr::Literal(Literal { value: Value::Nil })
         )
     }
 
     #[test]
     fn bool_literal_tokens() -> io::Result<()> {
-        for (kind, expected) in [(TokenKind::True, LoxLiteral::Bool(true)), (TokenKind::False, LoxLiteral::Bool(false))].iter() {
+        for (kind, expected) in [(TokenKind::True, Value::Bool(true)), (TokenKind::False, Value::Bool(false))].iter() {
             assert_tokens_parse_to_expr(
                 vec![
                     Token { kind: kind.clone(), lexeme: "".into(), line: 1 }, 
@@ -224,7 +225,7 @@ mod tests {
 
     impl Expr {
         fn make(b: bool) -> Expr {
-            Expr::Literal(Literal { value: LoxLiteral::Bool(b) })
+            Expr::Literal(Literal { value: Value::Bool(b) })
         }
     }
 }

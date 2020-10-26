@@ -1,4 +1,7 @@
-use crate::expr::{self, Expr, LoxLiteral};
+use crate::{
+    expr::{self, Expr},
+    value::Value,
+};
 
 pub fn print(e: &Expr) -> String {
     let mut printer = AstPrinter {};
@@ -40,10 +43,10 @@ impl expr::Visitor<String> for AstPrinter {
 
     fn visit_literal_expr(&mut self, e: &expr::Literal) -> String {
         match &e.value {
-            LoxLiteral::Bool(b) => b.to_string(),
-            LoxLiteral::Nil => "nil".to_string(),
-            LoxLiteral::Number(n) => n.to_string(),
-            LoxLiteral::String(s) => s.clone(),
+            Value::Bool(b) => b.to_string(),
+            Value::Nil => "nil".to_string(),
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => s.clone(),
         }
     }
 
@@ -62,7 +65,7 @@ mod tests {
 
     #[test]
     fn string_literal() {
-        let e = Expr::Literal(expr::Literal { value: LoxLiteral::String("yes".into()) });
+        let e = Expr::Literal(expr::Literal { value: Value::String("yes".into()) });
         assert_eq!("yes", print(&e));
     }
 
@@ -70,7 +73,7 @@ mod tests {
     fn grouped_number() {
         let e = Expr::Grouping(expr::Grouping {
             expression: Box::new(Expr::Literal(expr::Literal {
-                value: LoxLiteral::Number(531.9)
+                value: Value::Number(531.9)
             }))
         });
         assert_eq!("(group 531.9)", print(&e));
@@ -81,11 +84,11 @@ mod tests {
         let e = Expr::Binary(expr::Binary {
             left: Box::new(Expr::Unary(expr::Unary {
                 op: Token { kind: TokenKind::Minus, lexeme: "-".into(), line: 1 },
-                right: Box::new(Expr::Literal(expr::Literal { value: LoxLiteral::Number(123.0) })),
+                right: Box::new(Expr::Literal(expr::Literal { value: Value::Number(123.0) })),
             })),
             op: Token { kind: TokenKind::Star, lexeme: "*".into(), line: 1},
             right: Box::new(Expr::Grouping(expr::Grouping {
-                expression: Box::new(Expr::Literal(expr::Literal { value: LoxLiteral::Number(45.67) })),
+                expression: Box::new(Expr::Literal(expr::Literal { value: Value::Number(45.67) })),
             }))
         });
         assert_eq!("(* (- 123) (group 45.67))", print(&e));
