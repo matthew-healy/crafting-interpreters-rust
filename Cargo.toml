@@ -2,4 +2,5 @@
 
 members = [
     "rlox",
+    "astgen",
 ]
