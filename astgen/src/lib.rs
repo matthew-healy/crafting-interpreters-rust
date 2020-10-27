@@ -4,21 +4,27 @@ use syn::{
     punctuated::Punctuated,
     Ident, Token, Type,
 };
+use quote::quote;
+use heck::SnakeCase;
+
 /// Parses the following syntax:
+/// ```text
 /// generate_ast!(
 ///     $AST_NAME,
-///     [$(NODE_NAME => $($FIELD_NAME: $FIELD_TYPE),+)+])
+///     [$(NODE_NAME => { $($FIELD_NAME: $FIELD_TYPE),+)+ }])
 /// )
-//
-/// For example:
+/// ```
 ///
+/// For example:
+/// ```text
 /// generate_ast!(
 ///     Expr,
 ///     [
-///         Number => value: isize;
-///         Binary => left: Box<Expr>, op: char, right: Box<Expr>;
+///         Number => { value: isize };
+///         Binary => { left: Box<Expr>, op: char, right: Box<Expr> };
 ///     ]
 /// )
+/// ```
 struct Ast {
     name: Ident,
     nodes: Punctuated<AstNode, Token![;]>,
@@ -37,15 +43,17 @@ impl Parse for Ast {
 
 struct AstNode {
     name: Ident,
-    properties: Punctuated<Field, Token![,]>,
+    fields: Punctuated<Field, Token![,]>,
 }
 
 impl Parse for AstNode {
     fn parse(input: ParseStream) -> Result<Self> {
         let name: Ident = input.parse()?;
         input.parse::<Token![=>]>()?;
-        let properties = input.parse_terminated(Field::parse)?;
-        Ok(AstNode { name, properties })
+        let fields_input;
+        syn::braced!(fields_input in input);
+        let fields = fields_input.parse_terminated(Field::parse)?;
+        Ok(AstNode { name, fields })
     }
 }
 
@@ -67,19 +75,54 @@ impl Parse for Field {
 pub fn generate_ast(input: TokenStream) -> TokenStream {
     let Ast {
         name,
-        nodes: _,
+        nodes,
     } = syn::parse_macro_input!(input);
 
-    format!(
-        "\
-            enum {} {{\
-                S(S),\
-            }}\
-            \
-            struct S {{\
-                s: String,\
-            }}\
-        ", 
-        name.to_string(),
-    ).parse().expect("generate_ast! failed to parse")
+    let lowercase_name = quote::format_ident!("{}", name.to_string().to_lowercase());
+
+    let (node_names, visit_names): (Vec<_>, Vec<_>) = nodes.iter().map(|n| {
+        let visit_name = quote::format_ident!("visit_{}_{}", n.name.to_string().to_snake_case(), lowercase_name);
+        let name = &n.name;
+        (name, visit_name)
+    }).unzip();
+
+    let ast_enum = quote! {
+        #[derive(Debug, PartialEq)]
+        pub enum #name {
+            #(#node_names(#node_names)),*
+        }
+    };
+
+    let node_structs = nodes.iter().map(|n| {
+        let node_name = &n.name;
+        let field_names = n.fields.iter().map(|f| &f.name);
+        let field_types = n.fields.iter().map(|f| &f.ty);
+        quote! {
+            #[derive(Debug, PartialEq)]
+            pub struct #node_name {
+                #(pub(crate) #field_names: #field_types),*
+            }
+        }
+    });
+
+
+    let visitor = quote! {
+        pub(crate) trait Visitor<T> {
+            #(fn #visit_names(&mut self, e: &#node_names) -> T;)*
+        }
+
+        impl #name {
+            pub(crate) fn accept<T, V: Visitor<T>>(&self, v: &mut V) -> T {
+                match self {
+                    #(#name::#node_names(a) => v.#visit_names(a),)*
+                }
+            }
+        }
+    };
+
+    (quote! {
+        #ast_enum
+        #(#node_structs)*
+        #visitor
+    }).into()
 }
