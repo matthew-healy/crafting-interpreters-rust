@@ -1,5 +1,5 @@
 [package]
-name = "lox-rs"
+name = "rlox"
 version = "0.1.0"
 authors = ["Matthew Healy <matthew.healy@soundcloud.com>"]
 edition = "2018"

@@ -1,4 +1,4 @@
-use lox_rs::{
+use rlox::{
     error::Result,
     interpreter::Interpreter,
     scanner::Scanner,
