@@ -1,51 +1,13 @@
-use crate::{
-    token::Token,
-    value::Value,
-};
-
-macro_rules! generate_ast {
-    ($($typename:ident => $($propname:ident: $proptype:ty),+);+) => {
-        #[derive(Debug, PartialEq)]
-        pub enum Expr {
-            $($typename($typename)),+
-        }
-
-        $(
-            #[derive(Debug, PartialEq)]
-            pub struct $typename {
-                $(pub(crate) $propname: $proptype),+
-            }
-        )+
-    }
-}
-
-macro_rules! generate_visitor {
-    ($($typename:ident => $visitname:ident);+) => {
-        pub(crate) trait Visitor<T> {
-            $(fn $visitname(&mut self, e: &$typename) -> T;)+
-        }
-
-        impl Expr {
-            pub(crate) fn accept<T, V: Visitor<T>>(&self, v: &mut V) -> T {
-                match self {
-                    $(Expr::$typename(a) => v.$visitname(a),)+
-                }
-            }
-        }
-    };
-}
+use crate::token::Token;
+use crate::value::Value;
+use astgen::generate_ast;
 
 generate_ast!(
-    Binary => left: Box<Expr>, op: Token, right: Box<Expr>;
-    Grouping => expression: Box<Expr>;
-    Literal => value: Value;
-    Unary => op: Token, right: Box<Expr>
+    Expr,
+    [
+        Binary => { left: Box<Expr>, op: Token, right: Box<Expr> };
+        Grouping => { expression: Box<Expr> };
+        Literal => { value: Value };
+        Unary => { op: Token, right: Box<Expr> };
+    ]
 );
-
-generate_visitor!(
-    Binary => visit_binary_expr;
-    Grouping => visit_grouping_expr;
-    Literal => visit_literal_expr;
-    Unary => visit_unary_expr
-);
-

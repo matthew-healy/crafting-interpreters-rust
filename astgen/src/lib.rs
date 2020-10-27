@@ -78,8 +78,7 @@ pub fn generate_ast(input: TokenStream) -> TokenStream {
         nodes,
     } = syn::parse_macro_input!(input);
 
-    let lowercase_name = quote::format_ident!("{}", name.to_string().to_lowercase());
-
+    let lowercase_name = name.to_string().to_lowercase();
     let (node_names, visit_names): (Vec<_>, Vec<_>) = nodes.iter().map(|n| {
         let visit_name = quote::format_ident!("visit_{}_{}", n.name.to_string().to_snake_case(), lowercase_name);
         let name = &n.name;
