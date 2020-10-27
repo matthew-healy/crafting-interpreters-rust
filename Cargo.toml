@@ -1,9 +1,5 @@
-[package]
-name = "rlox"
-version = "0.1.0"
-authors = ["Matthew Healy <matthew.healy@soundcloud.com>"]
-edition = "2018"
+[workspace]
 
-[dependencies]
-peekmore = "0.5.6"
-phf = { version = "0.8.0", features = ["macros"] }
+members = [
+    "rlox",
+]
