@@ -1,7 +1,7 @@
 [package]
 name = "rlox"
 version = "0.1.0"
-authors = ["Matthew Healy <matthew.healy@soundcloud.com>"]
+authors = ["Matthew Healy <matthew@liamhealy.xyz>"]
 edition = "2018"
 
 [dependencies]
