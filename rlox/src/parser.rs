@@ -3,6 +3,7 @@ use std::iter::Peekable;
 use crate::{
     error::{Error, Result},
     expr::*,
+    stmt::{self, Stmt},
     token::*,
     value::Value,
 };
@@ -44,8 +45,34 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         Parser { tokens }
     }
 
-    pub fn parse(&mut self) -> Result<Expr> {
-        self.expression()
+    pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+        let mut statements = Vec::new();
+        while let Some(statement) = self.statement()? {
+            statements.push(statement);
+        }
+        Ok(statements)
+    }
+
+    fn statement(&mut self) -> Result<Option<Stmt>> {
+        Ok(if self.match_single(&TokenKind::Print).is_some() {
+            Some(self.print_statement()?)
+        } else if let Some(_t) = self.tokens.peek() {
+            Some(self.expression_statement()?)
+        } else {
+            None
+        })
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt> {
+        let expression = self.expression()?;
+        self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
+        Ok(Stmt::Print(stmt::Print { expression }))
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt> {
+        let expression = self.expression()?;
+        self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
+        Ok(Stmt::Expression(stmt::Expression { expression }))
     }
 
     fn expression(&mut self) -> Result<Expr> {
@@ -158,7 +185,8 @@ mod tests {
 
     fn assert_tokens_parse_to_expr(tokens: Vec<Token>, expr: Expr) -> io::Result<()> {
         let mut parser = Parser::new(tokens.into_iter());
-        assert_eq!(expr, parser.parse()?);
+        let parsed = parser.expression()?;
+        assert_eq!(expr, parsed);
         Ok(())
     }
 

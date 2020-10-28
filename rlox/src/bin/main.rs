@@ -67,11 +67,12 @@ fn run_prompt() -> Result<()> {
 fn run(source: &str) -> Result<()> {
     let scanner = Scanner::new(source);
     let tokens = scanner.into_iter().filter_map(|e| e.ok() );
-    let mut parser = Parser::new(tokens);
-    let parsed = parser.parse()?;
 
-    let mut interpreter = Interpreter::new();
-    interpreter.interpret(&mut std::io::stdout(), &parsed)?;
+    let mut parser = Parser::new(tokens);
+    let statements = parser.parse()?;
+
+    let mut interpreter = Interpreter::new(std::io::stdout());
+    interpreter.interpret(&statements)?;
 
     Ok(())
 }

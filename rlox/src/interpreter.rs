@@ -3,23 +3,31 @@ use std::io::Write;
 use crate::{
     error::{Error, Result},
     expr::{self, Expr},
+    stmt::{self, Stmt},
     token::{TokenKind, Token},
     value::Value,
 };
 
 
-pub struct Interpreter;
+pub struct Interpreter<W> {
+    writer: W,
+}
 
-impl Interpreter {
-    pub fn new() -> Self {
-        Interpreter{}
+impl <W: Write> Interpreter<W> {
+    pub fn new(writer: W) -> Self {
+        Interpreter { writer }
     }
 
-    pub fn interpret<W: Write>(&mut self, w: &mut W, e: &Expr) -> Result<()> {
-        self.evaluate(e)
-            .and_then(|r| 
-                writeln!(w, "{}", r).map_err(|e| e.into())
-            )
+    pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
+        for s in statements.iter() {
+            self.execute(s)?;
+        }
+        Ok(())
+    }
+
+    fn execute(&mut self, s: &Stmt) -> Result<()> {
+        s.accept(self)?;
+        Ok(())
     }
     
     fn evaluate(&mut self, e: &Expr) -> Result<Value> {
@@ -27,7 +35,20 @@ impl Interpreter {
     }
 }
 
-impl expr::Visitor<Result<Value>> for Interpreter {
+impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
+    fn visit_print_stmt(&mut self, p: &stmt::Print) -> Result<()> {
+        let value = self.evaluate(&p.expression)?;
+        writeln!(self.writer, "{}", value)?;
+        Ok(())
+    }
+
+    fn visit_expression_stmt(&mut self, e: &stmt::Expression) -> Result<()> {
+        self.evaluate(&e.expression)?;
+        Ok(())
+    }
+}
+
+impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     fn visit_binary_expr(&mut self, e: &expr::Binary) -> Result<Value> {
         let left = self.evaluate(e.left.as_ref())?;
         let right = self.evaluate(e.right.as_ref())?;
