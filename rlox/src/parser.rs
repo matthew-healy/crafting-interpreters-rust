@@ -45,22 +45,52 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         Parser { tokens }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+    pub fn parse(&mut self) -> Vec<Result<Stmt>> {
         let mut statements = Vec::new();
-        while let Some(statement) = self.statement()? {
+        while let Some(statement) = self.declaration() {
             statements.push(statement);
         }
-        Ok(statements)
+        statements
     }
 
-    fn statement(&mut self) -> Result<Option<Stmt>> {
-        Ok(if self.match_single(&TokenKind::Print).is_some() {
-            Some(self.print_statement()?)
-        } else if let Some(_t) = self.tokens.peek() {
-            Some(self.expression_statement()?)
+    fn declaration(&mut self) -> Option<Result<Stmt>> {
+        if self.tokens.peek() == None { return None }
+
+        let result = if let Some(_var) = self.match_single(&TokenKind::Var) {
+            self.var_declaration()
         } else {
-            None
-        })
+            self.statement()
+        };
+
+        if result.is_err() {
+            self.synchronise();
+        }
+
+        Some(result)
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt> {
+        let name = self.consume(&TokenKind::Identifier, "Expected variable name.")?;
+
+        let initializer = if self.match_single(&TokenKind::Equal).is_some() {
+            self.expression()?
+        } else {
+            // is this right?
+            Expr::Literal(Literal { value: Value::Nil })
+        };
+
+        self.consume(&TokenKind::Semicolon, "Expected ';' after variable declaration.")?;
+        Ok(Stmt::Var(stmt::Var { name, initializer }))
+    }
+
+    fn statement(&mut self) -> Result<Stmt> {
+        if self.match_single(&TokenKind::Print).is_some() {
+            self.print_statement()
+        } else if let Some(_t) = self.tokens.peek() {
+            self.expression_statement()
+        } else {
+            Err(Error::unexpected())
+        }
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {
@@ -129,6 +159,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             TokenKind::Nil => Ok(Expr::Literal(Literal { value: Value::Nil })),
             TokenKind::Number(n) => Ok(Expr::Literal(Literal { value: n.into() })),
             TokenKind::String(s) => Ok(Expr::Literal(Literal { value: Value::String(s) })),
+            TokenKind::Identifier => Ok(Expr::Variable(Variable { name: nxt })),
             TokenKind::LeftParen => {
                 let expression = Box::new(self.expression()?);
                  self.consume(&TokenKind::RightParen, "Expected ')' after expression.")?;
@@ -175,6 +206,26 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
     fn match_any(&mut self, kinds: &[&TokenKind]) -> Option<Token> {
         kinds.iter().find_map(|k| self.match_single(k) )
+    }
+
+    fn synchronise(& mut self) {
+        loop {
+            let current = self.tokens.next();
+
+            if let Some(token) = current {
+                use TokenKind::*;
+                if token.kind == Semicolon { break }
+
+                if let Some(next) = self.tokens.peek() {
+                    match next.kind {
+                        Class | Fun | Var
+                        | For | If | While
+                        | Print | Return => break,
+                        _ => continue,
+                    }
+                }
+            } else { break }
+        }
     }
 }
 

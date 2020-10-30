@@ -1,5 +1,4 @@
 use rlox::{
-    error::Result,
     interpreter::Interpreter,
     scanner::Scanner,
     parser::Parser,
@@ -9,70 +8,77 @@ use std::{
     io::{self, Write},
 };
 
-fn main() {
+fn main() -> io::Result<()> {
     let mut stdout = io::stdout();
     let mut stderr = io::stderr();
 
     let args: Vec<String> = env::args().collect();
-    let result = match args.len() {
-        1 => run_prompt(),
-        2 => run_file(args[1].as_str()),
+    match args.len() {
+        1 => run_prompt(&mut stdout, &mut stderr)?,
+        2 => run_file(args[1].as_str(), &mut stdout, &mut stderr)?,
         _ => {
-            writeln!(stdout, "Usage: rlox [script]").expect("Something went wrong");
+            writeln!(stdout, "Usage: rlox [script]")?;
             std::process::exit(64);
         },
     };
 
-    match result {
-        Err(e) => {
-            writeln!(stderr, "{}", e).expect("Something went wrong");
-            if e.is_runtime_error() {
-                std::process::exit(70);
-            } else {
-                std::process::exit(65);
-            }
-        },
-        Ok(()) => return,
-    }
+    Ok(())
 }
 
-fn run_file(path: &str) -> Result<()> {
+fn run_file(path: &str, out: &mut io::Stdout, err_out: &mut io::Stderr) -> io::Result<()> {
     let contents = std::fs::read_to_string(path)?;
-    run(contents.as_str())
+    run(contents.as_str(), out, err_out)
  }
 
-fn run_prompt() -> Result<()> {
+fn run_prompt(out: &mut io::Stdout, err_out: &mut io::Stderr) -> io::Result<()> {
     let mut buffer = String::new();
     let stdin = io::stdin();
-    let mut stdout = io::stdout();
-    let mut stderr = io::stderr();
 
     loop {
-        write!(stdout, "> ")?;
-        stdout.flush()?;
+        write!(out, "> ")?;
+        out.flush()?;
 
         buffer.clear();
 
         let num_bytes = stdin.read_line(&mut buffer)?;
         if num_bytes == 0 { break };
 
-        if let Err(e) = run(buffer.as_str()) {
-            writeln!(stderr, "{}", e)?;
-        }
+        run(buffer.as_str(), out, err_out)?;
     }
 
     Ok(())
 }
 
-fn run(source: &str) -> Result<()> {
+fn run<Out: Write, ErrOut: Write>(source: &str, out: &mut Out, err_out: &mut ErrOut) -> io::Result<()> {
     let scanner = Scanner::new(source);
-    let tokens = scanner.into_iter().filter_map(|e| e.ok() );
+    let (tokens, errors): (Vec<_>, Vec<_>) = scanner.into_iter().partition(Result::is_ok);
 
-    let mut parser = Parser::new(tokens);
-    let statements = parser.parse()?;
+    let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+    if !errors.is_empty() {
+        for e in errors.iter() {
+            writeln!(err_out, "{}", e)?;
+        }
+        std::process::exit(65);
+    }
 
-    let mut interpreter = Interpreter::new(std::io::stdout());
-    interpreter.interpret(&statements)?;
+    let tokens: Vec<_> = tokens.into_iter().map(Result::unwrap).collect();
+    let mut parser = Parser::new(tokens.into_iter());
+    let (statements, errors): (Vec<_>, Vec<_>) = parser.parse().into_iter().partition(Result::is_ok);
 
-    Ok(())
+    let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+    if !errors.is_empty() {
+        for e in errors.iter() {
+            writeln!(err_out, "{}", e)?;
+        }
+        std::process::exit(65);
+    }
+
+    let statements: Vec<_> = statements.into_iter().map(Result::unwrap).collect();
+    let mut interpreter = Interpreter::new(out);
+
+    match interpreter.interpret(&statements) {
+        Err(_e) => std::process::exit(70),
+        Ok(()) => Ok(())
+    }
 }
+

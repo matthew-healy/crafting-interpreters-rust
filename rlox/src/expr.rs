@@ -9,5 +9,6 @@ generate_ast!(
         Grouping => { expression: Box<Expr> };
         Literal => { value: Value };
         Unary => { op: Token, right: Box<Expr> };
+        Variable => { name: Token };
     ]
 );

@@ -46,6 +46,10 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
         self.evaluate(&e.expression)?;
         Ok(())
     }
+
+    fn visit_var_stmt(&mut self, v: &stmt::Var) -> Result<()> {
+        todo!()
+    }
 }
 
 impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
@@ -102,6 +106,10 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
             (TokenKind::Bang, right) => Ok(Bool(!right.is_truthy())),
             _ => unreachable!(),
         }
+    }
+
+    fn visit_variable_expr(&mut self, e: &expr::Variable) -> Result<Value> {
+        todo!()
     }
 }
 
