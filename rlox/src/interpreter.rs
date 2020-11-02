@@ -55,14 +55,23 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
         self.execute_block(&b.statements)
     }
 
-    fn visit_print_stmt(&mut self, p: &stmt::Print) -> Result<()> {
-        let value = self.evaluate(&p.expression)?;
-        writeln!(self.writer, "{}", value)?;
+    fn visit_expression_stmt(&mut self, e: &stmt::Expression) -> Result<()> {
+        self.evaluate(&e.expression)?;
         Ok(())
     }
 
-    fn visit_expression_stmt(&mut self, e: &stmt::Expression) -> Result<()> {
-        self.evaluate(&e.expression)?;
+    fn visit_if_stmt(&mut self, i: &stmt::If) -> Result<()> {
+        if self.evaluate(&i.condition)?.is_truthy() {
+            self.execute(&i.then_branch)?;
+        } else if let Some(else_branch) = &i.else_branch {
+            self.execute(&else_branch)?;
+        }
+        Ok(())
+    }
+
+    fn visit_print_stmt(&mut self, p: &stmt::Print) -> Result<()> {
+        let value = self.evaluate(&p.expression)?;
+        writeln!(self.writer, "{}", value)?;
         Ok(())
     }
 

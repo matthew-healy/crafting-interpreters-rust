@@ -83,7 +83,9 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     }
 
     fn statement(&mut self) -> Result<Stmt> {
-        if self.match_single(&TokenKind::Print).is_some() {
+        if self.match_single(&TokenKind::If).is_some() {
+            self.if_statement()
+        } else if self.match_single(&TokenKind::Print).is_some() {
             self.print_statement()
         } else if self.match_single(&TokenKind::LeftBrace).is_some() {
             Ok(Stmt::Block(stmt::Block { statements: self.block()? }))
@@ -92,6 +94,19 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         } else {
             Err(Error::unexpected())
         }
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt> {
+        self.consume(&TokenKind::LeftParen, "Expected '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(&TokenKind::RightParen, "Expected ')' after if condition.")?;
+
+        let then_branch = Box::new(self.statement()?);
+        let else_branch = if self.match_single(&TokenKind::Else).is_some() {
+            Some(Box::new(self.statement()?))
+        } else { None };
+
+        Ok(Stmt::If(stmt::If { condition, then_branch, else_branch }))
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {
