@@ -27,12 +27,14 @@ fn main() -> io::Result<()> {
 
 fn run_file(path: &str, out: &mut io::Stdout, err_out: &mut io::Stderr) -> io::Result<()> {
     let contents = std::fs::read_to_string(path)?;
-    run(contents.as_str(), out, err_out)
+    Lox::new(out, err_out).run(contents.as_str())
  }
 
 fn run_prompt(out: &mut io::Stdout, err_out: &mut io::Stderr) -> io::Result<()> {
     let mut buffer = String::new();
     let stdin = io::stdin();
+
+    let mut lox = Lox::new(io::stdout(), err_out);
 
     loop {
         write!(out, "> ")?;
@@ -43,42 +45,56 @@ fn run_prompt(out: &mut io::Stdout, err_out: &mut io::Stderr) -> io::Result<()> 
         let num_bytes = stdin.read_line(&mut buffer)?;
         if num_bytes == 0 { break };
 
-        run(buffer.as_str(), out, err_out)?;
+        lox.run(buffer.as_str())?;
     }
 
     Ok(())
 }
 
-fn run<Out: Write, ErrOut: Write>(source: &str, out: &mut Out, err_out: &mut ErrOut) -> io::Result<()> {
-    let scanner = Scanner::new(source);
-    let (tokens, errors): (Vec<_>, Vec<_>) = scanner.into_iter().partition(Result::is_ok);
-
-    let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
-    if !errors.is_empty() {
-        for e in errors.iter() {
-            writeln!(err_out, "{}", e)?;
-        }
-        std::process::exit(65);
-    }
-
-    let tokens: Vec<_> = tokens.into_iter().map(Result::unwrap).collect();
-    let mut parser = Parser::new(tokens.into_iter());
-    let (statements, errors): (Vec<_>, Vec<_>) = parser.parse().into_iter().partition(Result::is_ok);
-
-    let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
-    if !errors.is_empty() {
-        for e in errors.iter() {
-            writeln!(err_out, "{}", e)?;
-        }
-        std::process::exit(65);
-    }
-
-    let statements: Vec<_> = statements.into_iter().map(Result::unwrap).collect();
-    let mut interpreter = Interpreter::new(out);
-
-    match interpreter.interpret(&statements) {
-        Err(_e) => std::process::exit(70),
-        Ok(()) => Ok(())
-    }
+struct Lox<Out, ErrOut> {
+    interpreter: Interpreter<Out>,
+    err_out: ErrOut,
 }
 
+impl <Out: Write, ErrOut: Write> Lox<Out, ErrOut> {
+    fn new(out: Out, err_out: ErrOut) -> Self {
+        Self {
+            interpreter: Interpreter::new(out),
+            err_out,
+        }
+    }
+
+    fn run(&mut self, source: &str) -> io::Result<()> {
+        let scanner = Scanner::new(source);
+        let (tokens, errors): (Vec<_>, Vec<_>) = scanner.into_iter().partition(Result::is_ok);
+
+        let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+        if !errors.is_empty() {
+            for e in errors.iter() {
+                writeln!(self.err_out, "{}", e)?;
+            }
+            std::process::exit(65);
+        }
+
+        let tokens: Vec<_> = tokens.into_iter().map(Result::unwrap).collect();
+        let mut parser = Parser::new(tokens.into_iter());
+        let (statements, errors): (Vec<_>, Vec<_>) = parser.parse().into_iter().partition(Result::is_ok);
+
+        let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+        if !errors.is_empty() {
+            for e in errors.iter() {
+                writeln!(self.err_out, "{}", e)?;
+            }
+            std::process::exit(65);
+        }
+
+        let statements: Vec<_> = statements.into_iter().map(Result::unwrap).collect();
+        match self.interpreter.interpret(&statements) {
+            Err(e) => {
+                writeln!(self.err_out, "{}", e)?;
+                std::process::exit(70)
+            },
+            Ok(()) => Ok(())
+        }
+    }
+}
