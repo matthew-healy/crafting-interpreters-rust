@@ -138,6 +138,17 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
         Ok(e.value.clone())
     }
 
+    fn visit_logical_expr(&mut self, e: &expr::Logical) -> Result<Value> {
+        let left = self.evaluate(&e.left)?;
+
+        use TokenKind::*;
+        Ok(match (&e.op.kind, left.is_truthy()) {
+            (Or, true) | (And, false) => left,
+            (Or, false) | (And, true) => self.evaluate(&e.right)?,
+            _ => unreachable!("Logical expression must be either And or Or.")
+        })
+    }
+
     fn visit_unary_expr(&mut self, e: &expr::Unary) -> Result<Value> {
         let right = self.evaluate(e.right.as_ref())?;
         let kind = e.op.kind.clone();

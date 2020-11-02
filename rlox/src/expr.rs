@@ -9,6 +9,7 @@ generate_ast!(
         Binary   => { left: Box<Expr>, op: Token, right: Box<Expr> };
         Grouping => { expression: Box<Expr> };
         Literal  => { value: Value };
+        Logical  => { left: Box<Expr>, op: Token, right: Box<Expr> };
         Unary    => { op: Token, right: Box<Expr> };
         Variable => { name: Token };
     ]

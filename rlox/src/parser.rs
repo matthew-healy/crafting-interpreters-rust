@@ -89,7 +89,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             self.print_statement()
         } else if self.match_single(&TokenKind::LeftBrace).is_some() {
             Ok(Stmt::Block(stmt::Block { statements: self.block()? }))
-        } else if let Some(_t) = self.tokens.peek() {
+        } else if self.tokens.peek().is_some() {
             self.expression_statement()
         } else {
             Err(Error::unexpected())
@@ -140,7 +140,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     }
 
     fn assignment(&mut self) -> Result<Expr> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
         if let Some(equals) = self.match_single(&TokenKind::Equal) {
             if let Expr::Variable(lhs) = expr {
                 let value = self.assignment()?;
@@ -156,6 +156,28 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         } else {
             Ok(expr)
         }
+    }
+
+    fn or(&mut self) -> Result<Expr> {
+        let mut e = self.and()?;
+
+        while let Some(op) = self.match_single(&TokenKind::Or) {
+            let right = Box::new(self.and()?);
+            e = Expr::Logical(Logical { left: Box::new(e), op, right });
+        }
+
+        Ok(e)
+    }
+
+    fn and(&mut self) -> Result<Expr> {
+        let mut e = self.equality()?;
+
+        while let Some(op) = self.match_single(&TokenKind::And) {
+            let right = Box::new(self.equality()?);
+            e = Expr::Logical(Logical { left: Box::new(e), op, right });
+        }
+
+        Ok(e)
     }
 
     fn equality(&mut self) -> Result<Expr> {
