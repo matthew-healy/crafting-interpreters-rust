@@ -1,4 +1,5 @@
 pub mod error;
+mod environment;
 mod expr;
 pub mod interpreter;
 pub mod parser;

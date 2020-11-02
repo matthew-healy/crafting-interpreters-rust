@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use crate::{
+    environment::Environment,
     error::{Error, Result},
     expr::{self, Expr},
     stmt::{self, Stmt},
@@ -10,12 +11,13 @@ use crate::{
 
 
 pub struct Interpreter<W> {
+    environment: Environment,
     writer: W,
 }
 
 impl <W: Write> Interpreter<W> {
     pub fn new(writer: W) -> Self {
-        Interpreter { writer }
+        Interpreter { environment: Environment::new(), writer }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
@@ -48,7 +50,16 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     }
 
     fn visit_var_stmt(&mut self, v: &stmt::Var) -> Result<()> {
-        todo!()
+        let value = if let Some(initializer) = &v.initializer {
+            self.evaluate(initializer)?
+        } else {
+            Value::Nil
+        };
+
+        let var_name = v.name.lexeme.clone();
+
+        self.environment.define(var_name, value);
+        Ok(())
     }
 }
 
@@ -109,7 +120,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     }
 
     fn visit_variable_expr(&mut self, e: &expr::Variable) -> Result<Value> {
-        todo!()
+        self.environment.get(&e.name)
     }
 }
 

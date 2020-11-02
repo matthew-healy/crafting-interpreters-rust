@@ -73,10 +73,9 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         let name = self.consume(&TokenKind::Identifier, "Expected variable name.")?;
 
         let initializer = if self.match_single(&TokenKind::Equal).is_some() {
-            self.expression()?
+            Some(self.expression()?)
         } else {
-            // is this right?
-            Expr::Literal(Literal { value: Value::Nil })
+            None
         };
 
         self.consume(&TokenKind::Semicolon, "Expected ';' after variable declaration.")?;

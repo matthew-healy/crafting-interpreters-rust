@@ -9,6 +9,6 @@ generate_ast!(
     [
         Expression => { expression: Expr };
         Print => { expression: Expr };
-        Var => { name: Token, initializer: Expr };
+        Var => { name: Token, initializer: Option<Expr> };
     ]
 );
