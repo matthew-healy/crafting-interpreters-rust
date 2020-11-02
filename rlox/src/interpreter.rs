@@ -64,6 +64,12 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 }
 
 impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
+    fn visit_assign_expr(&mut self, a: &expr::Assign) -> Result<Value> {
+        let value = self.evaluate(&a.value)?;
+        self.environment.assign(&a.name, value.clone())?;
+        Ok(value)
+    }
+
     fn visit_binary_expr(&mut self, e: &expr::Binary) -> Result<Value> {
         let left = self.evaluate(e.left.as_ref())?;
         let right = self.evaluate(e.right.as_ref())?;

@@ -105,7 +105,26 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     }
 
     fn expression(&mut self) -> Result<Expr> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr> {
+        let expr = self.equality()?;
+        if let Some(equals) = self.match_single(&TokenKind::Equal) {
+            if let Expr::Variable(lhs) = expr {
+                let value = self.assignment()?;
+                Ok(Expr::Assign(Assign { name: lhs.name, value: Box::new(value) }))
+            } else {
+                // N.b. in jlox this error doesn't throw - it just returns
+                // the expr we already parsed on the lhs. This is inconvenient
+                // with rlox's current error-handling. I'm also not sure the
+                // overall difference in behaviour is worth the refactor this
+                // would require.
+                Err(Error::syntactic(equals, "Invalid assignment target."))
+            }
+        } else {
+            Ok(expr)
+        }
     }
 
     fn equality(&mut self) -> Result<Expr> {
