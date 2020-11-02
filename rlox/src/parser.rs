@@ -56,7 +56,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn declaration(&mut self) -> Option<Result<Stmt>> {
         if self.tokens.peek() == None { return None }
 
-        let result = if let Some(_var) = self.match_single(&TokenKind::Var) {
+        let result = if self.match_single(&TokenKind::Var).is_some() {
             self.var_declaration()
         } else {
             self.statement()
@@ -85,6 +85,8 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn statement(&mut self) -> Result<Stmt> {
         if self.match_single(&TokenKind::Print).is_some() {
             self.print_statement()
+        } else if self.match_single(&TokenKind::LeftBrace).is_some() {
+            Ok(Stmt::Block(stmt::Block { statements: self.block()? }))
         } else if let Some(_t) = self.tokens.peek() {
             self.expression_statement()
         } else {
@@ -102,6 +104,20 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         let expression = self.expression()?;
         self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
         Ok(Stmt::Expression(stmt::Expression { expression }))
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>> {
+        let mut statements = Vec::new();
+
+        while self.tokens.peek().map(|t| &t.kind) != Some(&TokenKind::RightBrace) {
+            match self.declaration() {
+                Some(d) => statements.push(d?),
+                None => break
+            }
+        }
+
+        self.consume(&TokenKind::RightBrace, "Expected '}' after block.")?;
+        Ok(statements)
     }
 
     fn expression(&mut self) -> Result<Expr> {

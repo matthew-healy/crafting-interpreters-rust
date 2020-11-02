@@ -7,9 +7,10 @@ declaration -> varDecl | statement ;
 
 varDecl     -> "var" IDENTIFIER ( "=" expression )? ";" ;
 
-statement   -> exprStmt | printStmt ;
+statement   -> exprStmt | printStmt | block ;
 exprStmt    -> expression ";" ;
 printStmt   -> "print" expression ";" ;
+block       -> "{" declaration* "}" ;
 
 expression  -> assignment ;
 assignment  -> IDENTIFIER "=" assignment | equality ;

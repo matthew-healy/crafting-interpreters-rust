@@ -31,6 +31,19 @@ impl <W: Write> Interpreter<W> {
         s.accept(self)?;
         Ok(())
     }
+
+    fn execute_block(&mut self, statements: &[Stmt]) -> Result<()> {
+        self.environment.push_child_env();
+        for statement in statements {
+            // Reset the environment before returning an error.
+            if let Err(error) = self.execute(statement) {
+                self.environment.pop_child_env();
+                return Err(error)
+            }
+        }
+        self.environment.pop_child_env();
+        Ok(())
+    }
     
     fn evaluate(&mut self, e: &Expr) -> Result<Value> {
         e.accept(self)
@@ -38,6 +51,10 @@ impl <W: Write> Interpreter<W> {
 }
 
 impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
+    fn visit_block_stmt(&mut self, b: &stmt::Block) -> Result<()> {
+        self.execute_block(&b.statements)
+    }
+
     fn visit_print_stmt(&mut self, p: &stmt::Print) -> Result<()> {
         let value = self.evaluate(&p.expression)?;
         writeln!(self.writer, "{}", value)?;
