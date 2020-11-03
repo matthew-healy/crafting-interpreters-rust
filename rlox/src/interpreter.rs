@@ -87,6 +87,13 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
         self.environment.define(var_name, value);
         Ok(())
     }
+
+    fn visit_while_stmt(&mut self, w: &stmt::While) -> Result<()> {
+        while self.evaluate(&w.condition)?.is_truthy() {
+            self.execute(&w.body)?;
+        }
+        Ok(())
+    }
 }
 
 impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
