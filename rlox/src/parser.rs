@@ -2,8 +2,8 @@ use std::iter::Peekable;
 
 use crate::{
     error::{Error, Result},
-    expr::*,
-    stmt::{self, Stmt},
+    expr::{Expr},
+    stmt::{Stmt},
     token::*,
     value::Value,
 };
@@ -79,7 +79,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         };
 
         self.consume(&TokenKind::Semicolon, "Expected ';' after variable declaration.")?;
-        Ok(Stmt::Var(stmt::Var { name, initializer }))
+        Ok(Stmt::new_var(name, initializer))
     }
 
     fn statement(&mut self) -> Result<Stmt> {
@@ -92,7 +92,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         } else if self.match_single(&TokenKind::While).is_some() {
             self.while_statement()
         } else if self.match_single(&TokenKind::LeftBrace).is_some() {
-            Ok(Stmt::Block(stmt::Block { statements: self.block()? }))
+            Ok(Stmt::new_block(self.block()?))
         } else if self.tokens.peek().is_some() {
             self.expression_statement()
         } else {
@@ -113,24 +113,24 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
         let condition = if !self.check_next(&TokenKind::Semicolon) {
             self.expression()?
-        } else { Expr::Literal(Literal { value: Value::from(true) }) };
+        } else { Expr::new_literal(Value::from(true)) };
 
         self.consume(&TokenKind::Semicolon, "Expected ';' after loop condition.")?;
 
         let increment = if !self.check_next(&TokenKind::RightParen) {
-            Some(Stmt::Expression(stmt::Expression { expression: self.expression()? }))
+            Some(Stmt::new_expression(self.expression()?))
         } else { None };
 
         self.consume(&TokenKind::RightParen, "Expected ')' after for clauses.")?;
 
         let body = self.statement()?;
         let body = Box::new(match increment {
-            Some(i) => Stmt::Block(stmt::Block { statements: vec![body, i]}),
+            Some(i) => Stmt::new_block(vec![body, i]),
             None => body,
         });
-        let while_loop = Stmt::While(stmt::While { condition, body });
+        let while_loop = Stmt::new_while(condition, body);
         let while_loop = match initializer {
-            Some(i) => Stmt::Block(stmt::Block { statements: vec![i, while_loop] }),
+            Some(i) => Stmt::new_block(vec![i, while_loop]),
             None => while_loop,
         };
 
@@ -147,13 +147,13 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             Some(Box::new(self.statement()?))
         } else { None };
 
-        Ok(Stmt::If(stmt::If { condition, then_branch, else_branch }))
+        Ok(Stmt::new_if(condition, then_branch, else_branch))
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {
         let expression = self.expression()?;
         self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
-        Ok(Stmt::Print(stmt::Print { expression }))
+        Ok(Stmt::new_print(expression))
     }
 
     fn while_statement(&mut self) -> Result<Stmt> {
@@ -162,13 +162,13 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         self.consume(&TokenKind::RightParen, "Expected ')' after condition.")?;
         let body = Box::new(self.statement()?);
 
-        Ok(Stmt::While(stmt::While { condition, body }))
+        Ok(Stmt::new_while(condition, body))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt> {
         let expression = self.expression()?;
         self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
-        Ok(Stmt::Expression(stmt::Expression { expression }))
+        Ok(Stmt::new_expression(expression))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>> {
@@ -194,7 +194,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         if let Some(equals) = self.match_single(&TokenKind::Equal) {
             if let Expr::Variable(lhs) = expr {
                 let value = self.assignment()?;
-                Ok(Expr::Assign(Assign { name: lhs.name, value: Box::new(value) }))
+                Ok(Expr::new_assign(lhs.name, Box::new(value)))
             } else {
                 // N.b. in jlox this error doesn't throw - it just returns
                 // the expr we already parsed on the lhs. This is inconvenient
@@ -213,7 +213,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
         while let Some(op) = self.match_single(&TokenKind::Or) {
             let right = Box::new(self.and()?);
-            e = Expr::Logical(Logical { left: Box::new(e), op, right });
+            e = Expr::new_logical(Box::new(e), op, right);
         }
 
         Ok(e)
@@ -224,7 +224,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
         while let Some(op) = self.match_single(&TokenKind::And) {
             let right = Box::new(self.equality()?);
-            e = Expr::Logical(Logical { left: Box::new(e), op, right });
+            e = Expr::new_logical(Box::new(e), op, right);
         }
 
         Ok(e)
@@ -261,7 +261,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn unary(&mut self) -> Result<Expr> {
         if let Some(token) = self.match_any(UNARY_TOKENS) {
             let right = Box::new(self.unary()?);
-            Ok(Expr::Unary(Unary { op: token, right }))
+            Ok(Expr::new_unary(token, right))
         } else {
             self.primary()
         }
@@ -275,16 +275,16 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         };
 
         match kind {
-            TokenKind::True => Ok(Expr::Literal(Literal { value: true.into() })),
-            TokenKind::False => Ok(Expr::Literal(Literal { value: false.into() })),
-            TokenKind::Nil => Ok(Expr::Literal(Literal { value: Value::Nil })),
-            TokenKind::Number(n) => Ok(Expr::Literal(Literal { value: n.into() })),
-            TokenKind::String(s) => Ok(Expr::Literal(Literal { value: Value::String(s) })),
-            TokenKind::Identifier => Ok(Expr::Variable(Variable { name: nxt })),
+            TokenKind::True => Ok(Expr::new_literal(Value::from(true))),
+            TokenKind::False => Ok(Expr::new_literal(Value::from(false))),
+            TokenKind::Nil => Ok(Expr::new_literal(Value::Nil)),
+            TokenKind::Number(n) => Ok(Expr::new_literal(Value::from(n))),
+            TokenKind::String(s) => Ok(Expr::new_literal(Value::String(s))),
+            TokenKind::Identifier => Ok(Expr::new_variable(nxt)),
             TokenKind::LeftParen => {
                 let expression = Box::new(self.expression()?);
                  self.consume(&TokenKind::RightParen, "Expected ')' after expression.")?;
-                 Ok(Expr::Grouping(Grouping { expression }))
+                 Ok(Expr::new_grouping(expression))
             },
             _ => Err(Error::syntactic(nxt, ""))
         }
@@ -316,7 +316,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
         while let Some(token) = self.match_any(kinds) {
             let right = Box::new(parse(self)?);
-            e = Expr::Binary(Binary { left: Box::new(e), op: token, right })
+            e = Expr::new_binary(Box::new(e), token, right)
         }
 
         Ok(e)
@@ -373,7 +373,7 @@ mod tests {
             vec![
                 Token { kind: TokenKind::String("abc".into()), lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::Literal(Literal { value: Value::String("abc".into()) })
+            Expr::new_literal(Value::String("abc".into()))
         )
     }
 
@@ -383,7 +383,7 @@ mod tests {
             vec![
                 Token { kind: TokenKind::Number(5.1), lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::Literal(Literal { value: Value::Number(5.1) })
+            Expr::new_literal(Value::Number(5.1))
         )
     }
 
@@ -393,7 +393,7 @@ mod tests {
             vec![
                 Token { kind: TokenKind::Nil, lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::Literal(Literal { value: Value::Nil })
+            Expr::new_literal(Value::Nil)
         )
     }
 
@@ -404,7 +404,7 @@ mod tests {
                 vec![
                     Token { kind: kind.clone(), lexeme: "".into(), line: 1 }, 
                 ], 
-                Expr::Literal(Literal { value: expected.clone() })
+                Expr::new_literal(expected.clone())
             )?;
         }
         Ok(())
@@ -418,7 +418,7 @@ mod tests {
                 not.clone(),
                 Token::make(TokenKind::True),
             ],
-            Expr::Unary(Unary { op: not, right: Box::new(Expr::make(true)) })
+            Expr::new_unary(not, Box::new(Expr::make(true)))
         )
     }
 
@@ -430,7 +430,7 @@ mod tests {
 
     impl Expr {
         fn make(b: bool) -> Expr {
-            Expr::Literal(Literal { value: Value::Bool(b) })
+            Expr::new_literal(Value::Bool(b))
         }
     }
 }

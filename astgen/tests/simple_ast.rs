@@ -43,6 +43,19 @@ fn uses_node_names_for_enum_variants() {
 }
 
 #[test]
+fn generates_new_fns() {
+    generate_ast!(
+        Test,
+        [
+            A => { a: isize };
+            B => { b: usize };
+        ]
+    );
+    let _a_node = Test::new_a(1);
+    let _b_node = Test::new_b(8);
+}
+
+#[test]
 fn generates_visitor_trait() {
     generate_ast!(
         Some,

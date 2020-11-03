@@ -104,6 +104,27 @@ pub fn generate_ast(input: TokenStream) -> TokenStream {
         }
     });
 
+    let constructor_fns = nodes.iter().map(|n| {
+        let enum_case = &n.name;
+        let struct_name = &n.name;
+        let snake_node_name = quote::format_ident!("new_{}", &n.name.to_string().to_snake_case());
+        let arg_names = n.fields.iter().map(|f| &f.name);
+        let field_names = arg_names.clone();
+        let field_types = n.fields.iter().map(|f| &f.ty);
+        quote! {
+            pub(crate) fn #snake_node_name(#(#arg_names: #field_types),*) -> Self {
+                Self::#enum_case(#struct_name {
+                    #(#field_names),*
+                })
+            }
+        }
+    });
+
+    let enum_impl = quote! {
+        impl #name {
+            #(#constructor_fns)*
+        }
+    };
 
     let visitor = quote! {
         pub(crate) trait Visitor<T> {
@@ -122,6 +143,7 @@ pub fn generate_ast(input: TokenStream) -> TokenStream {
     (quote! {
         #ast_enum
         #(#node_structs)*
+        #enum_impl
         #visitor
     }).into()
 }
