@@ -83,7 +83,9 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     }
 
     fn statement(&mut self) -> Result<Stmt> {
-        if self.match_single(&TokenKind::If).is_some() {
+        if self.match_single(&TokenKind::For).is_some() {
+            self.for_statement()
+        } else if self.match_single(&TokenKind::If).is_some() {
             self.if_statement()
         } else if self.match_single(&TokenKind::Print).is_some() {
             self.print_statement()
@@ -96,6 +98,43 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         } else {
             Err(Error::unexpected())
         }
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt> {
+        self.consume(&TokenKind::LeftParen, "Expected '(' after 'for'.")?;
+
+        let initializer = if self.match_single(&TokenKind::Semicolon).is_some() {
+            None
+        } else if self.match_single(&TokenKind::Var).is_some() {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        let condition = if !self.check_next(&TokenKind::Semicolon) {
+            self.expression()?
+        } else { Expr::Literal(Literal { value: Value::from(true) }) };
+
+        self.consume(&TokenKind::Semicolon, "Expected ';' after loop condition.")?;
+
+        let increment = if !self.check_next(&TokenKind::RightParen) {
+            Some(Stmt::Expression(stmt::Expression { expression: self.expression()? }))
+        } else { None };
+
+        self.consume(&TokenKind::RightParen, "Expected ')' after for clauses.")?;
+
+        let body = self.statement()?;
+        let body = Box::new(match increment {
+            Some(i) => Stmt::Block(stmt::Block { statements: vec![body, i]}),
+            None => body,
+        });
+        let while_loop = Stmt::While(stmt::While { condition, body });
+        let while_loop = match initializer {
+            Some(i) => Stmt::Block(stmt::Block { statements: vec![i, while_loop] }),
+            None => while_loop,
+        };
+
+        Ok(while_loop)
     }
 
     fn if_statement(&mut self) -> Result<Stmt> {
@@ -251,6 +290,12 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         }
     }
 
+    fn check_next(&mut self, kind: &TokenKind) -> bool {
+        self.tokens.peek()
+            .map(|t| &t.kind == kind)
+            .unwrap_or(false)
+    }
+
     fn consume(&mut self, kind: &TokenKind, error_msg: &str) -> Result<Token> {
         if let Some(token) = self.match_single(kind) {
             Ok(token)
@@ -278,8 +323,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     }
 
     fn match_single(&mut self, kind: &TokenKind) -> Option<Token> {
-        let nxt = self.tokens.peek()?;
-        if kind == &nxt.kind { 
+        if self.check_next(kind) {
             self.tokens.next() 
         } else { 
             None 
