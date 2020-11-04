@@ -71,6 +71,62 @@ impl Parse for Field {
     }
 }
 
+/// Generates an AST for the provided input. This includes a "top level"
+/// enum, with a case for each node type, new_{node} functions for each
+/// node, as well as a visitor trait with a visit function per node.
+///
+/// Example: the following invocation:
+/// ```text
+/// generate_ast!(
+///     Expr,
+///     [
+///         Binary  => { left: Box<Expr>, op: Token, right: Box<Expr> };
+///         Literal => { value: usize };
+///     ]
+/// );
+/// ```
+/// will generate code corresponding to:
+/// ```text
+/// pub enum Expr {
+///     Binary(Binary),
+///     Literal(Literal),
+/// }
+///
+/// pub struct Binary {
+///     pub(crate) left: Box<Expr>,
+///     pub(crate) op: Token,
+///     pub(crate) right: Box<Expr>,
+/// }
+///
+/// pub struct Literal {
+///     pub(crate) value: usize,
+/// }
+///
+/// impl Expr {
+///     pub(crate) fn new_binary(left: Box<Expr>, op: Token, right: Box<Expr>) -> Self {
+///         Self::Binary(Binary { left, op, right })
+///     }
+///
+///     pub(crate) fn new_literal(value: usize) -> Self {
+///         Self::Literal(Literal { value })
+///     }
+/// }
+///
+/// trait Visitor<T> {
+///     fn visit_binary_expr(&mut self, e: &Binary) -> T;
+///     fn visit_literal_expr(&mut self, e: &Literal) -> T;
+/// }
+///
+/// impl Expr {
+///     fn accept<T, V: Visitor<T>>(&self, v: &mut V) -> T {
+///         match self {
+///             Binary(b) => v.visit_binary_expr(b),
+///             Literal(l) => v.visit_literal_expr(l),
+///         }
+///     }
+/// }
+/// ```
+///
 #[proc_macro]
 pub fn generate_ast(input: TokenStream) -> TokenStream {
     let Ast {
