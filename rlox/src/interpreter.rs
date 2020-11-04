@@ -1,4 +1,7 @@
-use std::io::Write;
+use std::{
+    io::Write,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::{
     environment::Environment,
@@ -9,7 +12,6 @@ use crate::{
     value::Value,
 };
 
-
 pub struct Interpreter<W> {
     environment: Environment,
     writer: W,
@@ -17,7 +19,15 @@ pub struct Interpreter<W> {
 
 impl <W: Write> Interpreter<W> {
     pub fn new(writer: W) -> Self {
-        Interpreter { environment: Environment::new(), writer }
+        let mut environment = Environment::new();
+        environment.define("clock", Value::new_native_fn(&|| {
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time since epoch should never be negative")
+                .as_millis();
+            Value::from(time as f64)
+        }));
+        Interpreter { environment, writer }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
@@ -135,6 +145,28 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
             TokenKind::BangEqual => Ok(Bool(!left.is_equal(&right))),
             _ => unreachable!(),
         }
+    }
+
+    fn visit_call_expr(&mut self, e: &expr::Call) -> Result<Value> {
+        let callee = self.evaluate(&e.callee)?;
+
+        let args: Vec<Value> = e.arguments.iter()
+            .map(|a| self.evaluate(a))
+            .collect::<Result<_>>()?;
+
+        callee.callable()
+            .ok_or(Error::runtime(e.paren.clone(), "Can only call functions and classes."))
+            .and_then(|c| {
+                if args.len() == c.arity() {
+                    Ok(c)
+                } else {
+                    Err(Error::runtime(
+                        e.paren.clone(),
+                        format!("Expected {} arguments but got {}", c.arity(), args.len())
+                    ))
+                }
+            })
+            .map(|c| c.call(self, args))
     }
 
     fn visit_grouping_expr(&mut self, e: &expr::Grouping) -> Result<Value> {

@@ -1,3 +1,4 @@
+mod callable;
 pub mod error;
 mod environment;
 mod expr;

@@ -20,17 +20,17 @@ const COMPARISON_TOKENS: &'static [&'static TokenKind] = &[
     &TokenKind::LessEqual,
 ];
 
-static TERM_TOKENS: &'static [&'static TokenKind] = &[
+const TERM_TOKENS: &'static [&'static TokenKind] = &[
     &TokenKind::Minus,
     &TokenKind::Plus,
 ];
 
-static FACTOR_TOKENS: &'static [&'static TokenKind] = &[
+const FACTOR_TOKENS: &'static [&'static TokenKind] = &[
     &TokenKind::Star, 
     &TokenKind::Slash,
 ];
 
-static UNARY_TOKENS: &'static [&'static TokenKind] = &[
+const UNARY_TOKENS: &'static [&'static TokenKind] = &[
     &TokenKind::Bang,
     &TokenKind:: Minus,
 ];
@@ -263,7 +263,39 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             let right = Box::new(self.unary()?);
             Ok(Expr::new_unary(token, right))
         } else {
-            self.primary()
+            self.call()
+        }
+    }
+
+    fn call(&mut self) -> Result<Expr> {
+        let mut e = self.primary()?;
+
+        while self.match_single(&TokenKind::LeftParen).is_some() {
+            e = self.finish_call(e)?;
+        }
+
+        Ok(e)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+        let mut args = Vec::new();
+
+        if !self.check_next(&TokenKind::RightParen) {
+            args.push(self.expression()?);
+            while self.match_single(&TokenKind::Comma).is_some() {
+                args.push(self.expression()?);
+            }
+        }
+        let paren = self.consume(
+            &TokenKind::RightParen,
+            "Expected ')' after arguments."
+        )?;
+
+        if args.len() > 255 {
+            // Another situation where jlox merely reports the error & rlox bubbles it up.
+            Err(Error::syntactic(paren, "Function cannot have more than 255 arguments."))
+        } else {
+            Ok(Expr::new_call(Box::new(callee), paren, args))
         }
     }
 

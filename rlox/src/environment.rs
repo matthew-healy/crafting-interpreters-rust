@@ -48,8 +48,8 @@ impl Environment {
             })
     }
 
-    pub(crate) fn define(&mut self, name: String, value: Value) {
-        self.stack[0].define(name, value)
+    pub(crate) fn define<S: Into<String>>(&mut self, name: S, value: Value) {
+        self.stack[0].define(name.into(), value)
     }
 }
 
