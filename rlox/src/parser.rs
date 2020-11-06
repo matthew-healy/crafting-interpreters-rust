@@ -91,6 +91,8 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             self.if_statement()
         } else if self.match_single(&TokenKind::Print).is_some() {
             self.print_statement()
+        } else if let Some(token) = self.match_single(&TokenKind::Return) {
+            self.return_statement(token)
         } else if self.match_single(&TokenKind::While).is_some() {
             self.while_statement()
         } else if self.match_single(&TokenKind::LeftBrace).is_some() {
@@ -156,6 +158,14 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         let expression = self.expression()?;
         self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
         Ok(Stmt::new_print(expression))
+    }
+
+    fn return_statement(&mut self, token: Token) -> Result<Stmt> {
+        let return_value = if !self.check_next(&TokenKind::Semicolon) {
+            self.expression()?
+        } else { Expr::new_literal(Value::Nil) };
+        self.consume(&TokenKind::Semicolon, "Expected ';' after return value.")?;
+        Ok(Stmt::new_return(token, return_value))
     }
 
     fn while_statement(&mut self) -> Result<Stmt> {

@@ -20,6 +20,33 @@ impl Value {
     pub(crate) fn new_function(declaration: stmt::Function) -> Self {
         Value::Function(Function { declaration })
     }
+
+    pub(crate) fn is_equal(&self, other: &Value) -> bool {
+        use Value::*;
+        match (self, other) {
+            (Nil, Nil) => true,
+            (Bool(s), Bool(o)) => s == o,
+            (Number(s), Number(o)) => {
+                // Lox follows Java's Double convention in that NaN == NaN
+                // is true whereas f64 follows IEEE 754.
+                if s.is_nan() && o.is_nan() {
+                    true
+                } else {
+                    s == o
+                }
+            },
+            (String(s), String(o)) => s == o,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_truthy(&self) -> bool {
+        use Value::*;
+        match self {
+            Bool(false) | Nil => false,
+            _ => true,
+        }
+    }
 }
 
 impl From<bool> for Value {

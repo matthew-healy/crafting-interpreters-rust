@@ -1,14 +1,13 @@
 use crate::{
     environment::Environment,
-    error::Result,
-    interpreter::Interpreter,
+    interpreter::{self, Interpreter},
     value::{Function, NativeFn, Value},
 };
 use std::io::Write;
 
 pub(crate) trait Callable<W: Write> {
     fn arity(&self) -> usize;
-    fn call(&self, interpreter: &mut Interpreter<W>, args: Vec<Value>) -> Result<Value>;
+    fn call(&self, interpreter: &mut Interpreter<W>, args: Vec<Value>) -> interpreter::Result<Value>;
 }
 
 impl Value {
@@ -26,7 +25,7 @@ impl <W: Write> Callable<W> for NativeFn<&'static dyn Fn() -> Value> {
         0
     }
 
-    fn call(&self, _interpreter: &mut Interpreter<W>, _args: Vec<Value>) -> Result<Value> {
+    fn call(&self, _interpreter: &mut Interpreter<W>, _args: Vec<Value>) -> interpreter::Result<Value> {
         Ok((self.body)())
     }
 }
@@ -36,7 +35,7 @@ impl <W: Write> Callable<W> for Function {
         self.declaration.params.len()
     }
 
-    fn call(&self, interpreter: &mut Interpreter<W>, args: Vec<Value>) -> Result<Value> {
+    fn call(&self, interpreter: &mut Interpreter<W>, args: Vec<Value>) -> interpreter::Result<Value> {
         let mut environment = Environment::from(&interpreter.globals);
 
         let params_with_args = self.declaration.params.iter().zip(args);
@@ -45,7 +44,10 @@ impl <W: Write> Callable<W> for Function {
             environment.define(&param.lexeme, arg)
         }
 
-        interpreter.execute_block(&self.declaration.body, environment)?;
-        Ok(Value::Nil)
+        match interpreter.execute_block(&self.declaration.body, environment) {
+            Ok(()) => Ok(Value::Nil),
+            Err(interpreter::Thrown::Return(v)) => Ok(v),
+            Err(e) => Err(e),
+        }
     }
 }

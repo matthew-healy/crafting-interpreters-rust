@@ -7,12 +7,31 @@ use std::{
 
 use crate::{
     environment::Environment,
-    error::{Error, Result},
+    error::{Error, self},
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{TokenKind, Token},
     value::Value
 };
+
+pub(crate) type Result<T> = std::result::Result<T, Thrown>;
+
+pub(crate) enum Thrown {
+    Error(Error),
+    Return(Value),
+}
+
+impl From<error::Error> for Thrown {
+    fn from(e: error::Error) -> Self {
+        Self::Error(e)
+    }
+}
+
+impl From<std::io::Error> for Thrown {
+    fn from(e: std::io::Error) -> Self {
+        Self::from(error::Error::from(e))
+    }
+}
 
 pub struct Interpreter<W> {
     pub(crate) globals: Rc<RefCell<Environment>>,
@@ -34,16 +53,19 @@ impl <W: Write> Interpreter<W> {
         Interpreter { globals, environment, writer }
     }
 
-    pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
+    pub fn interpret(&mut self, statements: &[Stmt]) -> error::Result<()> {
         for s in statements.iter() {
-            self.execute(s)?;
+            match self.execute(s) {
+                Err(Thrown::Return(_v)) => unreachable!("return should never make it this far up the stack."),
+                Err(Thrown::Error(e)) => return Err(e),
+                _ => continue
+            }
         }
         Ok(())
     }
 
     fn execute(&mut self, s: &Stmt) -> Result<()> {
-        s.accept(self)?;
-        Ok(())
+        s.accept(self)
     }
 
     pub(crate) fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> Result<()> {
@@ -97,6 +119,10 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
         Ok(())
     }
 
+    fn visit_return_stmt(&mut self, r: &stmt::Return) -> Result<()> {
+        Err(Thrown::Return(self.evaluate(&r.value)?))
+    }
+
     fn visit_var_stmt(&mut self, v: &stmt::Var) -> Result<()> {
         let value = if let Some(initializer) = &v.initializer {
             self.evaluate(initializer)?
@@ -145,7 +171,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
                         return Ok(String(left))
                     } 
                 } 
-                Err(Error::runtime(e.op.clone(), "Operands must be two numbers or two strings."))
+                Err(Thrown::Error(Error::runtime(e.op.clone(), "Operands must be two numbers or two strings.")))
             }
             TokenKind::Slash => compute_if_numbers(&e.op, left, right, |l, r| l / r),
             TokenKind::Star => compute_if_numbers(&e.op, left, right, |l, r| l * r),
@@ -167,15 +193,15 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
             .collect::<Result<_>>()?;
 
         callee.callable()
-            .ok_or(Error::runtime(e.paren.clone(), "Can only call functions and classes."))
+            .ok_or(Thrown::Error(Error::runtime(e.paren.clone(), "Can only call functions and classes.")))
             .and_then(|c| {
                 if args.len() == c.arity() {
                     Ok(c)
                 } else {
-                    Err(Error::runtime(
+                    Err(Thrown::Error(Error::runtime(
                         e.paren.clone(),
                         format!("Expected {} arguments but got {}", c.arity(), args.len())
-                    ))
+                    )))
                 }
             })
             .and_then(|c| c.call(self, args))
@@ -207,14 +233,14 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
         use Value::*;
         match (kind, right) {
             (TokenKind::Minus, Number(right)) => Ok(Number(-right)),
-            (TokenKind::Minus, _) => Err(Error::runtime(e.op.clone(), "Operand must be a number.")),
+            (TokenKind::Minus, _) => Err(Thrown::Error(Error::runtime(e.op.clone(), "Operand must be a number."))),
             (TokenKind::Bang, right) => Ok(Bool(!right.is_truthy())),
             _ => unreachable!(),
         }
     }
 
     fn visit_variable_expr(&mut self, e: &expr::Variable) -> Result<Value> {
-        self.environment.borrow().get(&e.name)
+        Ok(self.environment.borrow().get(&e.name)?)
     }
 }
 
@@ -230,34 +256,5 @@ fn compute_if_numbers<T: Into<Value>>(
             return Ok(f(left, right).into())
         }
     }
-    Err(Error::runtime(op.clone(), "Operands must be numbers."))
-}
-
-impl Value {
-    fn is_equal(&self, other: &Value) -> bool {
-        use Value::*;
-        match (self, other) {
-            (Nil, Nil) => true,
-            (Bool(s), Bool(o)) => s == o,
-            (Number(s), Number(o)) => {
-                // Lox follows Java's Double convention in that NaN == NaN
-                // is true whereas f64 follows IEEE 754.
-                if s.is_nan() && o.is_nan() {
-                    true
-                } else {
-                    s == o
-                }
-            },
-            (String(s), String(o)) => s == o,
-            _ => false,
-        }
-    }
-
-    fn is_truthy(&self) -> bool {
-        use Value::*;
-        match self {
-            Bool(false) | Nil => false,
-            _ => true,
-        }
-    }
+    Err(Thrown::Error(Error::runtime(op.clone(), "Operands must be numbers.")))
 }

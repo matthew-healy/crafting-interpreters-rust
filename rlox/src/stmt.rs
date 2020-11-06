@@ -12,6 +12,7 @@ generate_ast!(
         Function   => { name: Token, params: Vec<Token>, body: Vec<Stmt> };
         If         => { condition: Expr, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>> };
         Print      => { expression: Expr };
+        Return     => { keyword: Token, value: Expr };
         Var        => { name: Token, initializer: Option<Expr> };
         While      => { condition: Expr, body: Box<Stmt> };
     ]
