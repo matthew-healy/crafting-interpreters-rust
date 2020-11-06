@@ -100,7 +100,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 
     fn visit_function_stmt(&mut self, f: &stmt::Function) -> Result<()> {
         let function = Value::new_function(f.clone());
-        self.environment.borrow_mut().define(&f.name.lexeme, function);
+        self.globals.borrow_mut().define(&f.name.lexeme, function);
         Ok(())
     }
 
