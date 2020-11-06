@@ -34,7 +34,7 @@ impl From<std::io::Error> for Thrown {
 }
 
 pub struct Interpreter<W> {
-    pub(crate) globals: Rc<RefCell<Environment>>,
+    globals: Rc<RefCell<Environment>>,
     environment: Rc<RefCell<Environment>>,
     writer: W,
 }
@@ -99,7 +99,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     }
 
     fn visit_function_stmt(&mut self, f: &stmt::Function) -> Result<()> {
-        let function = Value::new_function(f.clone());
+        let function = Value::new_function(f.clone(), Rc::clone(&self.environment));
         self.globals.borrow_mut().define(&f.name.lexeme, function);
         Ok(())
     }

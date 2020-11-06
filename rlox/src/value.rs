@@ -1,6 +1,6 @@
-use std::{fmt::{self, Debug, Display}};
+use std::{rc::Rc, cell::RefCell, fmt::{self, Debug, Display}};
 
-use crate::stmt;
+use crate::{environment::Environment, stmt};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Value {
@@ -17,8 +17,8 @@ impl Value {
         Value::NativeFn(NativeFn { body })
     }
 
-    pub(crate) fn new_function(declaration: stmt::Function) -> Self {
-        Value::Function(Function { declaration })
+    pub(crate) fn new_function(declaration: stmt::Function, environment: Rc<RefCell<Environment>>) -> Self {
+        Value::Function(Function { declaration, environment })
     }
 
     pub(crate) fn is_equal(&self, other: &Value) -> bool {
@@ -95,6 +95,7 @@ impl <F> PartialEq for NativeFn<F> {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Function {
     pub(crate) declaration: stmt::Function,
+    pub(crate) environment: Rc<RefCell<Environment>>,
 }
 
 impl fmt::Display for Function {

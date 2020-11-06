@@ -9,6 +9,7 @@ use crate::{
     value::Value,
 };
 
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Environment {
     enclosing: Option<Rc<RefCell<Environment>>>,
     values: HashMap<String, Value>,

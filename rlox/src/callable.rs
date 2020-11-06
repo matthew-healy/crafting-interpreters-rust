@@ -36,7 +36,7 @@ impl <W: Write> Callable<W> for Function {
     }
 
     fn call(&self, interpreter: &mut Interpreter<W>, args: Vec<Value>) -> interpreter::Result<Value> {
-        let mut environment = Environment::from(&interpreter.globals);
+        let mut environment = Environment::from(&self.environment);
 
         let params_with_args = self.declaration.params.iter().zip(args);
 
