@@ -56,7 +56,9 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn declaration(&mut self) -> Option<Result<Stmt>> {
         if self.tokens.peek() == None { return None }
 
-        let result = if self.match_single(&TokenKind::Var).is_some() {
+        let result = if self.match_single(&TokenKind::Fun).is_some() {
+            self.function("function")
+        } else if self.match_single(&TokenKind::Var).is_some() {
             self.var_declaration()
         } else {
             self.statement()
@@ -169,6 +171,38 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         let expression = self.expression()?;
         self.consume(&TokenKind::Semicolon, "Expected ';' after expression.")?;
         Ok(Stmt::new_expression(expression))
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt> {
+        let name = self.consume(
+            &TokenKind::Identifier,
+            format!("Expected {} name", kind).as_str()
+        )?;
+        self.consume(
+            &TokenKind::LeftParen,
+            format!("Expected '(' after {} name.", kind).as_str()
+        )?;
+
+        let mut parameters = Vec::new();
+        if !self.check_next(&TokenKind::RightParen) {
+            loop {
+                parameters.push(self.consume(&TokenKind::Identifier, "Expected a parameter name.")?);
+                if self.match_single(&TokenKind::Comma).is_none() { break }
+            }
+        }
+
+        if parameters.len() > 255 {
+            // Another error bubbled up instead of just reported.
+            return Err(Error::syntactic(name, "Cannot have more than 255 parameters."))
+        }
+
+        self.consume(&TokenKind::RightParen, "Expected ')' after parameters.")?;
+        self.consume(
+            &TokenKind::LeftBrace,
+            format!("Expect '{{' before {} body.", kind).as_str()
+        )?;
+
+        Ok(Stmt::new_function(name, parameters, self.block()?))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>> {

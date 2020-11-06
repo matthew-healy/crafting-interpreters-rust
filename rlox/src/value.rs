@@ -1,8 +1,11 @@
-use std::{fmt::{Debug, Display}};
+use std::{fmt::{self, Debug, Display}};
+
+use crate::stmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Value {
     Bool(bool),
+    Function(Function),
     NativeFn(NativeFn<&'static dyn Fn() -> Value>),
     Nil,
     Number(f64),
@@ -12,6 +15,10 @@ pub(crate) enum Value {
 impl Value {
     pub(crate) fn new_native_fn(body: &'static dyn Fn() -> Value) -> Self {
         Value::NativeFn(NativeFn { body })
+    }
+
+    pub(crate) fn new_function(declaration: stmt::Function) -> Self {
+        Value::Function(Function { declaration })
     }
 }
 
@@ -32,6 +39,7 @@ impl Display for Value {
         use Value::*;
         match self {
             Bool(b) => write!(f, "{}", b),
+            Function(fnc) => write!(f, "{}", fnc),
             NativeFn(_) => write!(f, "<native fn>"),
             Nil => write!(f, "nil"),
             Number(n) => write!(f, "{}", n),
@@ -54,5 +62,16 @@ impl <F> Debug for NativeFn<F> {
 impl <F> PartialEq for NativeFn<F> {
     fn eq(&self, _other: &Self) -> bool {
         false
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Function {
+    pub(crate) declaration: stmt::Function,
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<fn {}>", self.declaration.name.lexeme)
     }
 }

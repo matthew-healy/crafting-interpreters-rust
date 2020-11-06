@@ -1,6 +1,8 @@
 use std::{
     io::Write,
-    time::{SystemTime, UNIX_EPOCH},
+    rc::Rc,
+    cell::RefCell,
+    time::{SystemTime, UNIX_EPOCH}
 };
 
 use crate::{
@@ -9,25 +11,27 @@ use crate::{
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{TokenKind, Token},
-    value::Value,
+    value::Value
 };
 
 pub struct Interpreter<W> {
-    environment: Environment,
+    pub(crate) globals: Rc<RefCell<Environment>>,
+    environment: Rc<RefCell<Environment>>,
     writer: W,
 }
 
 impl <W: Write> Interpreter<W> {
     pub fn new(writer: W) -> Self {
-        let mut environment = Environment::new();
-        environment.define("clock", Value::new_native_fn(&|| {
+        let globals = Rc::new(RefCell::new(Environment::new()));
+        globals.borrow_mut().define("clock", Value::new_native_fn(&|| {
             let time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time since epoch should never be negative")
                 .as_millis();
             Value::from(time as f64)
         }));
-        Interpreter { environment, writer }
+        let environment = Rc::new(RefCell::new(Environment::from(&globals)));
+        Interpreter { globals, environment, writer }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) -> Result<()> {
@@ -42,16 +46,17 @@ impl <W: Write> Interpreter<W> {
         Ok(())
     }
 
-    fn execute_block(&mut self, statements: &[Stmt]) -> Result<()> {
-        self.environment.push_child_env();
+    pub(crate) fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> Result<()> {
+        let old_env = Rc::clone(&self.environment);
+        self.environment = Rc::new(RefCell::new(environment));
         for statement in statements {
             // Reset the environment before returning an error.
             if let Err(error) = self.execute(statement) {
-                self.environment.pop_child_env();
+                self.environment = old_env;
                 return Err(error)
             }
         }
-        self.environment.pop_child_env();
+        self.environment = old_env;
         Ok(())
     }
     
@@ -62,11 +67,18 @@ impl <W: Write> Interpreter<W> {
 
 impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     fn visit_block_stmt(&mut self, b: &stmt::Block) -> Result<()> {
-        self.execute_block(&b.statements)
+        let environment = Environment::from(&self.environment);
+        self.execute_block(&b.statements, environment)
     }
 
     fn visit_expression_stmt(&mut self, e: &stmt::Expression) -> Result<()> {
         self.evaluate(&e.expression)?;
+        Ok(())
+    }
+
+    fn visit_function_stmt(&mut self, f: &stmt::Function) -> Result<()> {
+        let function = Value::new_function(f.clone());
+        self.environment.borrow_mut().define(&f.name.lexeme, function);
         Ok(())
     }
 
@@ -94,7 +106,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 
         let var_name = v.name.lexeme.clone();
 
-        self.environment.define(var_name, value);
+        self.environment.borrow_mut().define(var_name, value);
         Ok(())
     }
 
@@ -109,7 +121,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     fn visit_assign_expr(&mut self, a: &expr::Assign) -> Result<Value> {
         let value = self.evaluate(&a.value)?;
-        self.environment.assign(&a.name, value.clone())?;
+        self.environment.borrow_mut().assign(&a.name, &value)?;
         Ok(value)
     }
 
@@ -166,7 +178,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
                     ))
                 }
             })
-            .map(|c| c.call(self, args))
+            .and_then(|c| c.call(self, args))
     }
 
     fn visit_grouping_expr(&mut self, e: &expr::Grouping) -> Result<Value> {
@@ -202,7 +214,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     }
 
     fn visit_variable_expr(&mut self, e: &expr::Variable) -> Result<Value> {
-        self.environment.get(&e.name)
+        self.environment.borrow().get(&e.name)
     }
 }
 

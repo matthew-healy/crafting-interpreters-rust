@@ -30,6 +30,13 @@ fn uses_field_names_for_struct_fields() {
 }
 
 #[test]
+fn can_clone_nodes() {
+    generate_ast!(A, [N => {a: usize}]);
+    let n = N { a: 0 };
+    let _clone = n.clone();
+}
+
+#[test]
 fn uses_node_names_for_enum_variants() {
     generate_ast!(
         Example,
