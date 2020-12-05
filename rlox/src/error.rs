@@ -10,6 +10,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum ErrorKind {
     Lexical { line: usize },
     Syntactic { token: Token },
+    Static { token: Token },
     Runtime { token: Token },
     Unexpected,
     Io(std::io::Error),
@@ -34,6 +35,11 @@ impl Error {
 
     pub fn runtime<S: Into<String>>(token: Token, message: S) -> Error {
         let kind = ErrorKind::Runtime { token };
+        Error { kind, message: message.into() }
+    }
+
+    pub fn static_analyzer<S: Into<String>>(token: Token, message: S) -> Error {
+        let kind = ErrorKind::Static { token };
         Error { kind, message: message.into() }
     }
 
@@ -77,7 +83,7 @@ impl Display for Error {
             Unexpected => 0,
             Io(_e) => 0,
             Lexical { line } => *line,
-            Syntactic { token } | Runtime { token }  => token.line,
+            Syntactic { token } | Runtime { token } | Static { token }  => token.line,
         };
         write!(f, "[line {}] Error{}: {}", line, self.loc(), self.message)
     }

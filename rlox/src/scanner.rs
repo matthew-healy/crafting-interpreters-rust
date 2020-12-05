@@ -1,6 +1,6 @@
 use crate::{
     error::{Error, Result},
-    token::{Token, TokenKind},
+    token::{HashableNumber, Token, TokenKind},
 };
 use peekmore::{PeekMore, PeekMoreIterator};
 use phf::phf_map;
@@ -165,7 +165,7 @@ impl <'a> Scanner<'a> {
                 self.line,
                 format!("Could not convert {} into a number", self.lexeme_buffer.clone())
             )),
-            Ok(number) => Ok(TokenKind::Number(number)),
+            Ok(number) => Ok(TokenKind::Number(HashableNumber(number))),
         }
     }
 

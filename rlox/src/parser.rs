@@ -5,7 +5,7 @@ use crate::{
     expr::{Expr},
     stmt::{Stmt},
     token::*,
-    value::Value,
+    value,
 };
 
 const EQUALITY_TOKENS: &'static [&'static TokenKind] = &[
@@ -117,7 +117,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
         let condition = if !self.check_next(&TokenKind::Semicolon) {
             self.expression()?
-        } else { Expr::new_literal(Value::from(true)) };
+        } else { Expr::new_literal(value::Literal::from(true)) };
 
         self.consume(&TokenKind::Semicolon, "Expected ';' after loop condition.")?;
 
@@ -163,7 +163,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn return_statement(&mut self, token: Token) -> Result<Stmt> {
         let return_value = if !self.check_next(&TokenKind::Semicolon) {
             self.expression()?
-        } else { Expr::new_literal(Value::Nil) };
+        } else { Expr::new_literal(value::Literal::Nil) };
         self.consume(&TokenKind::Semicolon, "Expected ';' after return value.")?;
         Ok(Stmt::new_return(token, return_value))
     }
@@ -351,11 +351,11 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
         };
 
         match kind {
-            TokenKind::True => Ok(Expr::new_literal(Value::from(true))),
-            TokenKind::False => Ok(Expr::new_literal(Value::from(false))),
-            TokenKind::Nil => Ok(Expr::new_literal(Value::Nil)),
-            TokenKind::Number(n) => Ok(Expr::new_literal(Value::from(n))),
-            TokenKind::String(s) => Ok(Expr::new_literal(Value::String(s))),
+            TokenKind::True => Ok(Expr::new_literal(true.into())),
+            TokenKind::False => Ok(Expr::new_literal(false.into())),
+            TokenKind::Nil => Ok(Expr::new_literal(value::Literal::Nil)),
+            TokenKind::Number(n) => Ok(Expr::new_literal(n.into())),
+            TokenKind::String(s) => Ok(Expr::new_literal(s.into())),
             TokenKind::Identifier => Ok(Expr::new_variable(nxt)),
             TokenKind::LeftParen => {
                 let expression = Box::new(self.expression()?);
@@ -449,7 +449,7 @@ mod tests {
             vec![
                 Token { kind: TokenKind::String("abc".into()), lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::new_literal(Value::String("abc".into()))
+            Expr::new_literal(value::Literal::String("abc".into()))
         )
     }
 
@@ -457,9 +457,9 @@ mod tests {
     fn number_literal_token() -> io::Result<()> {
         assert_tokens_parse_to_expr(
             vec![
-                Token { kind: TokenKind::Number(5.1), lexeme: "".into(), line: 1 }, 
+                Token { kind: TokenKind::Number(HashableNumber(5.1)), lexeme: "".into(), line: 1 },
             ], 
-            Expr::new_literal(Value::Number(5.1))
+            Expr::new_literal(value::Literal::Number(HashableNumber(5.1)))
         )
     }
 
@@ -469,13 +469,13 @@ mod tests {
             vec![
                 Token { kind: TokenKind::Nil, lexeme: "".into(), line: 1 }, 
             ], 
-            Expr::new_literal(Value::Nil)
+            Expr::new_literal(value::Literal::Nil)
         )
     }
 
     #[test]
     fn bool_literal_tokens() -> io::Result<()> {
-        for (kind, expected) in [(TokenKind::True, Value::Bool(true)), (TokenKind::False, Value::Bool(false))].iter() {
+        for (kind, expected) in [(TokenKind::True, value::Literal::Bool(true)), (TokenKind::False, value::Literal::Bool(false))].iter() {
             assert_tokens_parse_to_expr(
                 vec![
                     Token { kind: kind.clone(), lexeme: "".into(), line: 1 }, 
@@ -506,7 +506,7 @@ mod tests {
 
     impl Expr {
         fn make(b: bool) -> Expr {
-            Expr::new_literal(Value::Bool(b))
+            Expr::new_literal(value::Literal::Bool(b))
         }
     }
 }

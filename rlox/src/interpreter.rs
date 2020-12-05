@@ -1,7 +1,8 @@
 use std::{
+    collections::HashMap,
+    cell::RefCell,
     io::Write,
     rc::Rc,
-    cell::RefCell,
     time::{SystemTime, UNIX_EPOCH}
 };
 
@@ -35,6 +36,7 @@ impl From<std::io::Error> for Thrown {
 
 pub struct Interpreter<W> {
     globals: Rc<RefCell<Environment>>,
+    locals: HashMap<Expr, usize>,
     environment: Rc<RefCell<Environment>>,
     writer: W,
 }
@@ -42,15 +44,23 @@ pub struct Interpreter<W> {
 impl <W: Write> Interpreter<W> {
     pub fn new(writer: W) -> Self {
         let globals = Rc::new(RefCell::new(Environment::new()));
+
         globals.borrow_mut().define("clock", Value::new_native_fn(&|| {
             let time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time since epoch should never be negative")
                 .as_millis();
-            Value::from(time as f64)
+            Value::Number(time as f64)
         }));
+
+        let locals = HashMap::new();
         let environment = Rc::new(RefCell::new(Environment::from(&globals)));
-        Interpreter { globals, environment, writer }
+        Interpreter {
+            globals,
+            locals,
+            environment,
+            writer,
+        }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) -> error::Result<()> {
@@ -85,6 +95,22 @@ impl <W: Write> Interpreter<W> {
     fn evaluate(&mut self, e: &Expr) -> Result<Value> {
         e.accept(self)
     }
+
+    fn lookup_variable(&mut self, name: &Token, e: &Expr) -> Result<Value> {
+        if let Some(distance) = self.locals.get(&e) {
+            self.environment.borrow_mut()
+                .get_at(*distance, &name)
+                .map_err(|e| Thrown::Error(e))
+        } else {
+            self.globals.borrow().get(&name).map_err(Thrown::from)
+        }
+    }
+}
+
+impl <W> Interpreter<W> {
+    pub(crate) fn resolve(&mut self, e: &Expr, depth: usize) {
+        self.locals.insert(e.clone(), depth);
+    }
 }
 
 impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
@@ -100,7 +126,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 
     fn visit_function_stmt(&mut self, f: &stmt::Function) -> Result<()> {
         let function = Value::new_function(f.clone(), Rc::clone(&self.environment));
-        self.globals.borrow_mut().define(&f.name.lexeme, function);
+        self.environment.borrow_mut().define(&f.name.lexeme, function);
         Ok(())
     }
 
@@ -147,7 +173,13 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     fn visit_assign_expr(&mut self, a: &expr::Assign) -> Result<Value> {
         let value = self.evaluate(&a.value)?;
-        self.environment.borrow_mut().assign(&a.name, &value)?;
+
+        if let Some(distance) = self.locals.get(&Expr::Assign(a.clone())) {
+            self.environment.borrow_mut().assign_at(*distance, &a.name, &value)?;
+        } else {
+            self.globals.borrow_mut().assign(&a.name, &value)?;
+        }
+
         Ok(value)
     }
 
@@ -212,7 +244,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     }
 
     fn visit_literal_expr(&mut self, e: &expr::Literal) -> Result<Value> {
-        Ok(e.value.clone())
+        Ok(e.value.clone().into())
     }
 
     fn visit_logical_expr(&mut self, e: &expr::Logical) -> Result<Value> {
@@ -240,7 +272,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
     }
 
     fn visit_variable_expr(&mut self, e: &expr::Variable) -> Result<Value> {
-        Ok(self.environment.borrow().get(&e.name)?)
+        self.lookup_variable(&e.name, &Expr::Variable(e.clone()))
     }
 }
 

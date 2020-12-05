@@ -1,7 +1,8 @@
 use rlox::{
     interpreter::Interpreter,
-    scanner::Scanner,
     parser::Parser,
+    resolver::Resolver,
+    scanner::Scanner,
 };
 use std::{
     env,
@@ -87,8 +88,11 @@ impl <Out: Write, ErrOut: Write> Lox<Out, ErrOut> {
             }
             std::process::exit(65);
         }
-
         let statements: Vec<_> = statements.into_iter().map(Result::unwrap).collect();
+
+        let mut resolver = Resolver::new(&mut self.interpreter);
+        resolver.resolve_stmts(&statements)?;
+
         match self.interpreter.interpret(&statements) {
             Err(e) => {
                 writeln!(self.err_out, "{}", e)?;

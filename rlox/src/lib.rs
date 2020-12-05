@@ -4,6 +4,7 @@ mod environment;
 mod expr;
 pub mod interpreter;
 pub mod parser;
+pub mod resolver;
 pub mod scanner;
 mod stmt;
 mod token;

@@ -87,20 +87,20 @@ impl Parse for Field {
 /// ```
 /// will generate code corresponding to:
 /// ```text
-/// #[derive(Clone, Debug, PartialEq)]
+/// #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 /// pub enum Expr {
 ///     Binary(Binary),
 ///     Literal(Literal),
 /// }
 ///
-/// #[derive(Clone, Debug, PartialEq)]
+/// #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 /// pub struct Binary {
 ///     pub(crate) left: Box<Expr>,
 ///     pub(crate) op: Token,
 ///     pub(crate) right: Box<Expr>,
 /// }
 ///
-/// #[derive(Clone, Debug, PartialEq)]
+/// #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 /// pub struct Literal {
 ///     pub(crate) value: usize,
 /// }
@@ -145,7 +145,7 @@ pub fn generate_ast(input: TokenStream) -> TokenStream {
     }).unzip();
 
     let ast_enum = quote! {
-        #[derive(Clone, Debug, PartialEq)]
+        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         pub enum #name {
             #(#node_names(#node_names)),*
         }
@@ -156,7 +156,7 @@ pub fn generate_ast(input: TokenStream) -> TokenStream {
         let field_names = n.fields.iter().map(|f| &f.name);
         let field_types = n.fields.iter().map(|f| &f.ty);
         quote! {
-            #[derive(Clone, Debug, PartialEq)]
+            #[derive(Clone, Debug, Eq, Hash, PartialEq)]
             pub struct #node_name {
                 #(pub(crate) #field_names: #field_types),*
             }
