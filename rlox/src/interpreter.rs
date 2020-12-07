@@ -12,7 +12,7 @@ use crate::{
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{TokenKind, Token},
-    value::Value
+    value::Value,
 };
 
 pub(crate) type Result<T> = std::result::Result<T, Thrown>;
@@ -117,6 +117,14 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     fn visit_block_stmt(&mut self, b: &stmt::Block) -> Result<()> {
         let environment = Environment::from(&self.environment);
         self.execute_block(&b.statements, environment)
+    }
+
+    fn visit_class_stmt(&mut self, c: &stmt::Class) -> Result<()> {
+        let mut env = self.environment.borrow_mut();
+        env.define(&c.name.lexeme, Value::Nil);
+        let class = Value::new_class(&c.name.lexeme);
+        env.assign(&c.name, &class)?;
+        Ok(())
     }
 
     fn visit_expression_stmt(&mut self, e: &stmt::Expression) -> Result<()> {

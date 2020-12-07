@@ -1,4 +1,8 @@
-use std::{rc::Rc, cell::RefCell, fmt::{self, Debug, Display}};
+use std::{
+    rc::Rc,
+    cell::RefCell,
+    fmt::{self, Debug, Display}
+};
 
 use crate::{
     environment::Environment,
@@ -35,7 +39,9 @@ impl From<String> for Literal {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Value {
     Bool(bool),
+    Class(Class),
     Function(Function),
+    Instance(Instance),
     NativeFn(NativeFn<&'static dyn Fn() -> Value>),
     Nil,
     Number(f64),
@@ -66,6 +72,14 @@ impl From<bool> for Value {
 }
 
 impl Value {
+    pub(crate) fn new_class<S: Into<String>>(name: S) -> Self {
+        Value::Class(Class { name: name.into() })
+    }
+
+    pub(crate) fn new_instance(class: Class) -> Self {
+        Value::Instance(Instance { class })
+    }
+
     pub(crate) fn new_native_fn(body: &'static dyn Fn() -> Value) -> Self {
         Value::NativeFn(NativeFn { body })
     }
@@ -107,7 +121,9 @@ impl Display for Value {
         use Value::*;
         match self {
             Bool(b) => write!(f, "{}", b),
+            Class(c) => write!(f, "{}", &c.name),
             Function(fnc) => write!(f, "{}", fnc),
+            Instance(i) => write!(f, "{} instance", &i.class.name),
             NativeFn(_) => write!(f, "<native fn>"),
             Nil => write!(f, "nil"),
             Number(n) => write!(f, "{}", n),
@@ -143,4 +159,14 @@ impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<fn {}>", self.declaration.name.lexeme)
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Class {
+    pub(crate) name: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Instance {
+    class: Class,
 }

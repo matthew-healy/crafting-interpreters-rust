@@ -114,6 +114,12 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
         Ok(())
     }
 
+    fn visit_class_stmt(&mut self, c: &stmt::Class) -> Result<()> {
+        self.declare(&c.name)?;
+        self.define(&c.name);
+        Ok(())
+    }
+
     fn visit_expression_stmt(&mut self, e: &stmt::Expression) -> Result<()> {
         self.resolve_expr(&e.expression)
     }

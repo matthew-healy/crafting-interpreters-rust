@@ -1,7 +1,7 @@
 use crate::{
     environment::Environment,
     interpreter::{self, Interpreter},
-    value::{Function, NativeFn, Value},
+    value::{Class, Function, NativeFn, Value},
 };
 use std::io::Write;
 
@@ -13,6 +13,7 @@ pub(crate) trait Callable<W: Write> {
 impl Value {
     pub(crate) fn callable<W: Write>(&self) -> Option<&dyn Callable<W>> {
         match self {
+            Value::Class(ref c) => Some(c),
             Value::Function(ref f) => Some(f),
             Value::NativeFn(ref n) => Some(n),
             _ => None,
@@ -49,5 +50,15 @@ impl <W: Write> Callable<W> for Function {
             Err(interpreter::Thrown::Return(v)) => Ok(v),
             Err(e) => Err(e),
         }
+    }
+}
+
+impl <W: Write> Callable<W> for Class {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(&self, _interpreter: &mut Interpreter<W>, _args: Vec<Value>) -> interpreter::Result<Value> {
+        Ok(Value::new_instance(self.clone()))
     }
 }
