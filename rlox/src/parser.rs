@@ -330,8 +330,15 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn call(&mut self) -> Result<Expr> {
         let mut e = self.primary()?;
 
-        while self.match_single(&TokenKind::LeftParen).is_some() {
-            e = self.finish_call(e)?;
+        loop {
+            if self.match_single(&TokenKind::LeftParen).is_some() {
+                e = self.finish_call(e)?;
+            } else if self.match_single(&TokenKind::Dot).is_some() {
+                let name = self.consume(&TokenKind::Identifier, "Expected property name after '.'.")?;
+                e = Expr::new_get(Box::new(e), name);
+            } else {
+                break
+            }
         }
 
         Ok(e)

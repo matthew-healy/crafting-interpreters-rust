@@ -191,6 +191,10 @@ impl <'a, W> expr::Visitor<Result<()>> for Resolver<'a, W> {
         Ok(())
     }
 
+    fn visit_get_expr(&mut self, g: &expr::Get) -> Result<()> {
+        self.resolve_expr(&g.object)
+    }
+
     fn visit_grouping_expr(&mut self, e: &expr::Grouping) -> Result<()> {
         self.resolve_expr(&e.expression)
     }

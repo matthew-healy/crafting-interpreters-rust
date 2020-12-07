@@ -1,13 +1,15 @@
 use std::{
     rc::Rc,
     cell::RefCell,
-    fmt::{self, Debug, Display}
+    fmt::{self, Debug, Display},
+    collections::HashMap,
 };
 
 use crate::{
     environment::Environment,
+    error::{Error, Result},
     stmt,
-    token::HashableNumber,
+    token::{Token, HashableNumber},
 };
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -77,7 +79,7 @@ impl Value {
     }
 
     pub(crate) fn new_instance(class: Class) -> Self {
-        Value::Instance(Instance { class })
+        Value::Instance(Instance { class, fields: HashMap::new() })
     }
 
     pub(crate) fn new_native_fn(body: &'static dyn Fn() -> Value) -> Self {
@@ -169,4 +171,17 @@ pub(crate) struct Class {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Instance {
     class: Class,
+    fields: HashMap<String, Value>,
+}
+
+impl Instance {
+    pub(crate) fn get(&self, name: &Token) -> Result<Value> {
+        match self.fields.get(&name.lexeme) {
+            Some(val) => Ok(val.clone()),
+            None => Err(Error::runtime(
+                name.clone(),
+                format!("Undefined property {}.", &name.lexeme)
+            )),
+        }
+    }
 }

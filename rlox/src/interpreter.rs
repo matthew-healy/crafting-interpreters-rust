@@ -247,6 +247,16 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
             .and_then(|c| c.call(self, args))
     }
 
+    fn visit_get_expr(&mut self, g: &expr::Get) -> Result<Value> {
+        match self.evaluate(&g.object)? {
+            Value::Instance(i) => i.get(&g.name).map_err(Thrown::Error),
+            _ => Err(Thrown::Error(Error::runtime(
+                g.name.clone(),
+                "Only instances have properties."
+            ))),
+        }
+    }
+
     fn visit_grouping_expr(&mut self, e: &expr::Grouping) -> Result<Value> {
         self.evaluate(&e.expression)
     }
