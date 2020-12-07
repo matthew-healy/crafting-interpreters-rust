@@ -62,7 +62,7 @@ impl Error {
     fn loc(&self) -> String {
         use ErrorKind::*;
         match self.kind() {
-            Syntactic { token } | Runtime { token } => {
+            Syntactic { token } | Runtime { token } | Static { token } => {
                 if token.kind == TokenKind::EndOfFile {
                     " at end".to_string()
                 } else {

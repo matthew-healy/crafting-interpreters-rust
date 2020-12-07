@@ -14,14 +14,25 @@ enum VariableState {
     Defined,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FunctionType {
+    None,
+    Function,
+}
+
 pub struct Resolver<'a, W> {
     interpreter: &'a mut Interpreter<W>,
     scopes: Vec<HashMap<String, VariableState>>,
+    current_function: FunctionType,
 }
 
 impl <'a, W> Resolver<'a, W> {
     pub fn new(interpreter: &'a mut Interpreter<W>) -> Self {
-        Resolver { interpreter, scopes: vec![HashMap::new()] }
+        Resolver {
+            interpreter,
+            scopes: vec![HashMap::new()],
+            current_function: FunctionType::None
+        }
     }
 
     pub fn resolve_stmts(&mut self, s: &[Stmt]) -> Result<()> {
@@ -47,10 +58,17 @@ impl <'a, W> Resolver<'a, W> {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, n: &Token) {
+    fn declare(&mut self, n: &Token) -> Result<()> {
         if let Some(scope) = self.scopes.last_mut() {
+            if scope.contains_key(&n.lexeme) {
+                return Err(Error::static_analyzer(
+                    n.clone(),
+                    "A variable with this name already exists in this scope."
+                ))
+            }
             scope.insert(n.lexeme.clone(), VariableState::Declared);
         }
+        Ok(())
     }
 
     fn define(&mut self, n: &Token) {
@@ -72,14 +90,18 @@ impl <'a, W> Resolver<'a, W> {
         }
     }
 
-    fn resolve_function(&mut self, f: &stmt::Function) -> Result<()> {
+    fn resolve_function(&mut self, f: &stmt::Function, t: FunctionType) -> Result<()> {
+        let enclosing_function = self.current_function;
+        self.current_function = t;
+
         self.begin_scope();
         for param in f.params.iter() {
-            self.declare(&param);
+            self.declare(&param)?;
             self.define(&param);
         }
         self.resolve_stmts(&f.body)?;
         self.end_scope();
+        self.current_function = enclosing_function;
         Ok(())
     }
 }
@@ -97,9 +119,9 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
     }
 
     fn visit_function_stmt(&mut self, f: &stmt::Function) -> Result<()> {
-        self.declare(&f.name);
+        self.declare(&f.name)?;
         self.define(&f.name);
-        self.resolve_function(&f)?;
+        self.resolve_function(&f, FunctionType::Function)?;
         Ok(())
     }
 
@@ -117,11 +139,17 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
     }
 
     fn visit_return_stmt(&mut self, r: &stmt::Return) -> Result<()> {
+        if self.current_function == FunctionType::None {
+            return Err(Error::static_analyzer(
+                r.keyword.clone(),
+                "Can't return from top-level code."
+            ))
+        }
         self.resolve_expr(&r.value)
     }
 
     fn visit_var_stmt(&mut self, v: &stmt::Var) -> Result<()> {
-        self.declare(&v.name);
+        self.declare(&v.name)?;
         if let Some(ref i) = v.initializer {
             self.resolve_expr(i)?;
         }

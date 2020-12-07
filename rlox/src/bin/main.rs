@@ -91,7 +91,9 @@ impl <Out: Write, ErrOut: Write> Lox<Out, ErrOut> {
         let statements: Vec<_> = statements.into_iter().map(Result::unwrap).collect();
 
         let mut resolver = Resolver::new(&mut self.interpreter);
-        resolver.resolve_stmts(&statements)?;
+        if let Err(e) = resolver.resolve_stmts(&statements) {
+            return writeln!(self.err_out, "{}", e)
+        }
 
         match self.interpreter.interpret(&statements) {
             Err(e) => {
