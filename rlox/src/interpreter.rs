@@ -122,7 +122,14 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     fn visit_class_stmt(&mut self, c: &stmt::Class) -> Result<()> {
         let mut env = self.environment.borrow_mut();
         env.define(&c.name.lexeme, Value::Nil);
-        let class = Value::new_class(&c.name.lexeme);
+
+        let mut methods = HashMap::new();
+        for method in c.methods.iter() {
+            let function = Value::new_function(method.clone(), Rc::clone(&self.environment));
+            methods.insert(method.name.lexeme.clone(), function);
+        }
+
+        let class = Value::new_class(&c.name.lexeme, methods);
         env.assign(&c.name, &class)?;
         Ok(())
     }

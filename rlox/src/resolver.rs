@@ -18,6 +18,7 @@ enum VariableState {
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver<'a, W> {
@@ -117,6 +118,11 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
     fn visit_class_stmt(&mut self, c: &stmt::Class) -> Result<()> {
         self.declare(&c.name)?;
         self.define(&c.name);
+
+        for method in c.methods.iter() {
+            self.resolve_function(&method, FunctionType::Method)?;
+        }
+
         Ok(())
     }
 

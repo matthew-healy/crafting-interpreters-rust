@@ -74,8 +74,8 @@ impl From<bool> for Value {
 }
 
 impl Value {
-    pub(crate) fn new_class<S: Into<String>>(name: S) -> Self {
-        Value::Class(Class { name: name.into() })
+    pub(crate) fn new_class<S: Into<String>>(name: S, fields: HashMap<String, Value>) -> Self {
+        Value::Class(Class { name: name.into(), fields })
     }
 
     pub(crate) fn new_instance(class: Class) -> Self {
@@ -87,7 +87,7 @@ impl Value {
     }
 
     pub(crate) fn new_function(declaration: stmt::Function, closure: Rc<RefCell<Environment>>) -> Self {
-        Value::Function(Function { declaration, closure })
+        Value::Function(Function::new(declaration, closure))
     }
 
     pub(crate) fn is_equal(&self, other: &Value) -> bool {
@@ -157,6 +157,15 @@ pub(crate) struct Function {
     pub(crate) closure: Rc<RefCell<Environment>>,
 }
 
+impl Function {
+    pub(crate) fn new(declaration: stmt::Function, closure: Rc<RefCell<Environment>>) -> Self {
+        Self {
+            declaration,
+            closure,
+        }
+    }
+}
+
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<fn {}>", self.declaration.name.lexeme)
@@ -166,6 +175,13 @@ impl fmt::Display for Function {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Class {
     pub(crate) name: String,
+    fields: HashMap<String, Value>,
+}
+
+impl Class {
+    fn get_field(&self, name: &str) -> Option<Value> {
+        self.fields.get(name).map(|m| m.clone())
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -176,13 +192,18 @@ pub(crate) struct Instance {
 
 impl Instance {
     pub(crate) fn get(&self, name: &Token) -> Result<Value> {
-        match self.fields.get(&name.lexeme) {
-            Some(val) => Ok(val.clone()),
-            None => Err(Error::runtime(
-                name.clone(),
-                format!("Undefined property {}.", &name.lexeme)
-            )),
-        }
+        self.get_field(&name)
+            .or_else(|| self.class.get_field(&name.lexeme))
+            .ok_or_else(||
+                Error::runtime(
+                    name.clone(),
+                    format!("Undefined property {}.", &name.lexeme)
+                )
+            )
+    }
+
+    fn get_field(&self, name: &Token) -> Option<Value> {
+        self.fields.get(&name.lexeme).map(|f| f.clone())
     }
 
     pub(crate) fn set(&mut self, name: &Token, value: &Value) {
