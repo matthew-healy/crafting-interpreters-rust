@@ -208,6 +208,11 @@ impl <'a, W> expr::Visitor<Result<()>> for Resolver<'a, W> {
         self.resolve_expr(&e.right)
     }
 
+    fn visit_set_expr(&mut self, e: &expr::Set) -> Result<()> {
+        self.resolve_expr(&e.value)?;
+        self.resolve_expr(&e.object)
+    }
+
     fn visit_unary_expr(&mut self, e: &expr::Unary) -> Result<()> {
         self.resolve_expr(&e.right)
     }

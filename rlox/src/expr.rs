@@ -12,6 +12,7 @@ generate_ast!(
         Grouping => { expression: Box<Expr> };
         Literal  => { value: value::Literal };
         Logical  => { left: Box<Expr>, op: Token, right: Box<Expr> };
+        Set      => { object: Box<Expr>, name: Token, value: Box<Expr> };
         Unary    => { op: Token, right: Box<Expr> };
         Variable => { name: Token };
     ]

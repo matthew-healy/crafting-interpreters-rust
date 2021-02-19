@@ -1,6 +1,6 @@
 use std::{
-    collections::HashMap,
     cell::RefCell,
+    collections::HashMap,
     io::Write,
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH}
@@ -249,7 +249,7 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
 
     fn visit_get_expr(&mut self, g: &expr::Get) -> Result<Value> {
         match self.evaluate(&g.object)? {
-            Value::Instance(i) => i.get(&g.name).map_err(Thrown::Error),
+            Value::Instance(i) => i.borrow().get(&g.name).map_err(Thrown::Error),
             _ => Err(Thrown::Error(Error::runtime(
                 g.name.clone(),
                 "Only instances have properties."
@@ -274,6 +274,20 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
             (Or, false) | (And, true) => self.evaluate(&e.right)?,
             _ => unreachable!("Logical expression must be either And or Or.")
         })
+    }
+
+    fn visit_set_expr(&mut self, e: &expr::Set) -> Result<Value> {
+        match self.evaluate(&e.object)? {
+            Value::Instance(i) => {
+                let value = self.evaluate(&e.value)?;
+                i.borrow_mut().set(&e.name, &value);
+                Ok(value)
+            },
+            _ => Err(Thrown::Error(Error::runtime(
+                e.name.clone(),
+                "Only instances have properties."
+            )))
+        }
     }
 
     fn visit_unary_expr(&mut self, e: &expr::Unary) -> Result<Value> {

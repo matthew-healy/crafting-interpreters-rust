@@ -43,7 +43,7 @@ pub(crate) enum Value {
     Bool(bool),
     Class(Class),
     Function(Function),
-    Instance(Instance),
+    Instance(Rc<RefCell<Instance>>),
     NativeFn(NativeFn<&'static dyn Fn() -> Value>),
     Nil,
     Number(f64),
@@ -79,7 +79,7 @@ impl Value {
     }
 
     pub(crate) fn new_instance(class: Class) -> Self {
-        Value::Instance(Instance { class, fields: HashMap::new() })
+        Value::Instance(Rc::new(RefCell::new(Instance { class, fields: HashMap::new() })))
     }
 
     pub(crate) fn new_native_fn(body: &'static dyn Fn() -> Value) -> Self {
@@ -125,7 +125,7 @@ impl Display for Value {
             Bool(b) => write!(f, "{}", b),
             Class(c) => write!(f, "{}", &c.name),
             Function(fnc) => write!(f, "{}", fnc),
-            Instance(i) => write!(f, "{} instance", &i.class.name),
+            Instance(i) => write!(f, "{} instance", &i.borrow().class.name),
             NativeFn(_) => write!(f, "<native fn>"),
             Nil => write!(f, "nil"),
             Number(n) => write!(f, "{}", n),
@@ -168,7 +168,7 @@ pub(crate) struct Class {
     pub(crate) name: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct Instance {
     class: Class,
     fields: HashMap<String, Value>,
@@ -183,5 +183,9 @@ impl Instance {
                 format!("Undefined property {}.", &name.lexeme)
             )),
         }
+    }
+
+    pub(crate) fn set(&mut self, name: &Token, value: &Value) {
+        self.fields.insert(name.lexeme.clone(), value.clone());
     }
 }

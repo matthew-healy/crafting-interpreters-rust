@@ -252,16 +252,16 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     fn assignment(&mut self) -> Result<Expr> {
         let expr = self.or()?;
         if let Some(equals) = self.match_single(&TokenKind::Equal) {
-            if let Expr::Variable(lhs) = expr {
-                let value = self.assignment()?;
-                Ok(Expr::new_assign(lhs.name, Box::new(value)))
-            } else {
-                // N.b. in jlox this error doesn't throw - it just returns
+            let value = self.assignment()?;
+            match expr {
+                Expr::Variable(lhs) => Ok(Expr::new_assign(lhs.name, Box::new(value))),
+                Expr::Get(lhs) => Ok(Expr::new_set(lhs.object, lhs.name, Box::new(value))),
+                 // N.b. in jlox this error doesn't throw - it just returns
                 // the expr we already parsed on the lhs. This is inconvenient
                 // with rlox's current error-handling. I'm also not sure the
                 // overall difference in behaviour is worth the refactor this
                 // would require.
-                Err(Error::syntactic(equals, "Invalid assignment target."))
+                _ => Err(Error::syntactic(equals, "Invalid assignment target."))
             }
         } else {
             Ok(expr)
@@ -518,6 +518,27 @@ mod tests {
                 Token::make(TokenKind::True),
             ],
             Expr::new_unary(not, Box::new(Expr::make(true)))
+        )
+    }
+
+    #[test]
+    fn set_tokens() -> io::Result<()> {
+        let hi = Token { kind: TokenKind::Identifier, lexeme: "hi".into(), line: 0 };
+        let name = Token { kind: TokenKind::Identifier, lexeme: "name".into(), line: 0 };
+        assert_tokens_parse_to_expr(
+            vec![
+                hi.clone(),
+                Token { kind: TokenKind::Dot, lexeme: ".".into(), line: 0 },
+                name.clone(),
+                Token { kind: TokenKind::Equal, lexeme: "=".into(), line: 0 },
+                Token { kind: TokenKind::String("Hello".into()), lexeme: "\"Hello\"".into(), line: 0 },
+                Token { kind: TokenKind::Semicolon, lexeme: ";".into(), line: 0 },
+            ],
+            Expr::new_set(
+                Box::new(Expr::new_variable(hi)),
+                name,
+                Box::new(Expr::new_literal(value::Literal::String("Hello".into())))
+            )
         )
     }
 
