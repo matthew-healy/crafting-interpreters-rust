@@ -21,10 +21,17 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ClassType {
+    None,
+    Class,
+}
+
 pub struct Resolver<'a, W> {
     interpreter: &'a mut Interpreter<W>,
     scopes: Vec<HashMap<String, VariableState>>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl <'a, W> Resolver<'a, W> {
@@ -32,7 +39,8 @@ impl <'a, W> Resolver<'a, W> {
         Resolver {
             interpreter,
             scopes: vec![HashMap::new()],
-            current_function: FunctionType::None
+            current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -116,13 +124,23 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
     }
 
     fn visit_class_stmt(&mut self, c: &stmt::Class) -> Result<()> {
+        let enclosing_class = self.current_class;
+        self.current_class = ClassType::Class;
+
         self.declare(&c.name)?;
         self.define(&c.name);
+
+        self.begin_scope();
+        self.scopes.last_mut().and_then(|s|
+            s.insert("this".into(), VariableState::Defined)
+        );
 
         for method in c.methods.iter() {
             self.resolve_function(&method, FunctionType::Method)?;
         }
 
+        self.end_scope();
+        self.current_class = enclosing_class;
         Ok(())
     }
 
@@ -217,6 +235,16 @@ impl <'a, W> expr::Visitor<Result<()>> for Resolver<'a, W> {
     fn visit_set_expr(&mut self, e: &expr::Set) -> Result<()> {
         self.resolve_expr(&e.value)?;
         self.resolve_expr(&e.object)
+    }
+
+    fn visit_this_expr(&mut self, e: &expr::This) -> Result<()> {
+        match self.current_class {
+            ClassType::None => Err(Error::syntactic(
+                e.keyword.clone(),
+                "Can't use 'this' outside of a class."
+            )),
+            _ => Ok(self.resolve_local(&Expr::This(e.clone()), &e.keyword))
+        }
     }
 
     fn visit_unary_expr(&mut self, e: &expr::Unary) -> Result<()> {

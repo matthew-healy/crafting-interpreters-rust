@@ -1,8 +1,8 @@
 use std::{
-    rc::Rc,
     cell::RefCell,
-    fmt::{self, Debug, Display},
     collections::HashMap,
+    fmt::{self, Debug, Display},
+    rc::Rc
 };
 
 use crate::{
@@ -41,9 +41,9 @@ impl From<String> for Literal {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Value {
     Bool(bool),
-    Class(Class),
+    Class(ClassPointer),
     Function(Function),
-    Instance(Rc<RefCell<Instance>>),
+    Instance(InstancePointer),
     NativeFn(NativeFn<&'static dyn Fn() -> Value>),
     Nil,
     Number(f64),
@@ -75,11 +75,7 @@ impl From<bool> for Value {
 
 impl Value {
     pub(crate) fn new_class<S: Into<String>>(name: S, fields: HashMap<String, Value>) -> Self {
-        Value::Class(Class { name: name.into(), fields })
-    }
-
-    pub(crate) fn new_instance(class: Class) -> Self {
-        Value::Instance(Rc::new(RefCell::new(Instance { class, fields: HashMap::new() })))
+        Value::Class(ClassPointer::new(name.into(), fields))
     }
 
     pub(crate) fn new_native_fn(body: &'static dyn Fn() -> Value) -> Self {
@@ -123,9 +119,9 @@ impl Display for Value {
         use Value::*;
         match self {
             Bool(b) => write!(f, "{}", b),
-            Class(c) => write!(f, "{}", &c.name),
+            Class(c) => write!(f, "{}", c),
             Function(fnc) => write!(f, "{}", fnc),
-            Instance(i) => write!(f, "{} instance", &i.borrow().class.name),
+            Instance(i) => write!(f, "{}", i),
             NativeFn(_) => write!(f, "<native fn>"),
             Nil => write!(f, "nil"),
             Number(n) => write!(f, "{}", n),
@@ -164,6 +160,12 @@ impl Function {
             closure,
         }
     }
+
+    pub(crate) fn binding(&self, i: InstancePointer) -> Function {
+        let mut env = Environment::from(&self.closure);
+        env.define("this", Value::Instance(i));
+        Function { declaration: self.declaration.clone(), closure: Rc::new(RefCell::new(env)) }
+    }
 }
 
 impl fmt::Display for Function {
@@ -178,22 +180,63 @@ pub(crate) struct Class {
     fields: HashMap<String, Value>,
 }
 
-impl Class {
-    fn get_field(&self, name: &str) -> Option<Value> {
-        self.fields.get(name).map(|m| m.clone())
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ClassPointer(Rc<RefCell<Class>>);
+
+impl ClassPointer {
+    fn new(name: String, fields: HashMap<String, Value>) -> Self {
+        let class = Class { name, fields };
+        Self(Rc::new(RefCell::new(class)))
+    }
+
+    pub(crate) fn get_field(&self, name: &str) -> Option<Value> {
+        let class = self.0.borrow();
+        class.fields.get(name).map(|m| m.clone())
+    }
+
+    pub(crate) fn instantiate(&self) -> InstancePointer {
+        InstancePointer::new(Instance {
+            class: self.clone(),
+            fields: HashMap::new()
+        })
+    }
+}
+
+impl Display for ClassPointer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} instance", self.0.borrow().name)
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Instance {
-    class: Class,
+    class: ClassPointer,
     fields: HashMap<String, Value>,
 }
 
 impl Instance {
+    fn get_field(&self, name: &str) -> Option<Value> {
+        self.fields.get(name).map(|f| f.clone())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct InstancePointer(Rc<RefCell<Instance>>);
+
+impl InstancePointer {
+    pub(crate) fn new(instance: Instance) -> Self {
+        Self(Rc::new(RefCell::new(instance)))
+    }
+
     pub(crate) fn get(&self, name: &Token) -> Result<Value> {
-        self.get_field(&name)
-            .or_else(|| self.class.get_field(&name.lexeme))
+        let instance = self.0.borrow();
+        instance.get_field(&name.lexeme)
+            .or_else(|| {
+                let field = instance.class.get_field(&name.lexeme);
+                if let Some(Value::Function(method)) = field {
+                    Some(Value::Function(method.binding(self.clone())))
+                } else { field }
+            })
             .ok_or_else(||
                 Error::runtime(
                     name.clone(),
@@ -202,11 +245,14 @@ impl Instance {
             )
     }
 
-    fn get_field(&self, name: &Token) -> Option<Value> {
-        self.fields.get(&name.lexeme).map(|f| f.clone())
+    pub(crate) fn set(&self, name: &Token, value: &Value) {
+        let mut instance = self.0.borrow_mut();
+        instance.fields.insert(name.lexeme.clone(), value.clone());
     }
+}
 
-    pub(crate) fn set(&mut self, name: &Token, value: &Value) {
-        self.fields.insert(name.lexeme.clone(), value.clone());
+impl Display for InstancePointer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} instance", self.0.borrow().class)
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     environment::Environment,
     interpreter::{self, Interpreter},
-    value::{Class, Function, NativeFn, Value},
+    value::{ClassPointer, Function, NativeFn, Value},
 };
 use std::io::Write;
 
@@ -53,12 +53,20 @@ impl <W: Write> Callable<W> for Function {
     }
 }
 
-impl <W: Write> Callable<W> for Class {
+impl <W: Write> Callable<W> for ClassPointer {
     fn arity(&self) -> usize {
-        0
+        match self.get_field("init") {
+            Some(Value::Function(f)) => f.declaration.params.len(),
+            _ => 0
+        }
+
     }
 
-    fn call(&self, _interpreter: &mut Interpreter<W>, _args: Vec<Value>) -> interpreter::Result<Value> {
-        Ok(Value::new_instance(self.clone()))
+    fn call(&self, interpreter: &mut Interpreter<W>, args: Vec<Value>) -> interpreter::Result<Value> {
+        let instance = self.instantiate();
+        if let Some(Value::Function(init)) = self.get_field("init") {
+            init.binding(instance.clone()).call(interpreter, args)?;
+        }
+        Ok(Value::Instance(instance))
     }
 }

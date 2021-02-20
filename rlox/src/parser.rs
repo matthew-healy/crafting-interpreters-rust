@@ -367,11 +367,8 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
     }
 
     fn primary(&mut self) -> Result<Expr> {
-        let (nxt, kind) = {
-            let next = self.tokens.next().ok_or(Error::unexpected())?;
-            let kind = next.kind.clone();
-            (next, kind)
-        };
+        let token = self.tokens.next().ok_or(Error::unexpected())?;
+        let kind = token.kind.clone();
 
         match kind {
             TokenKind::True => Ok(Expr::new_literal(true.into())),
@@ -379,13 +376,14 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             TokenKind::Nil => Ok(Expr::new_literal(value::Literal::Nil)),
             TokenKind::Number(n) => Ok(Expr::new_literal(n.into())),
             TokenKind::String(s) => Ok(Expr::new_literal(s.into())),
-            TokenKind::Identifier => Ok(Expr::new_variable(nxt)),
+            TokenKind::This => Ok(Expr::new_this(token)),
+            TokenKind::Identifier => Ok(Expr::new_variable(token)),
             TokenKind::LeftParen => {
                 let expression = Box::new(self.expression()?);
                  self.consume(&TokenKind::RightParen, "Expected ')' after expression.")?;
                  Ok(Expr::new_grouping(expression))
             },
-            _ => Err(Error::syntactic(nxt, ""))
+            _ => Err(Error::syntactic(token, ""))
         }
     }
 
