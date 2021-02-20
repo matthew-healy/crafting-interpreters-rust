@@ -165,7 +165,10 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     }
 
     fn visit_return_stmt(&mut self, r: &stmt::Return) -> Result<()> {
-        Err(Thrown::Return(self.evaluate(&r.value)?))
+        let to_return = r.value.as_ref()
+            .map(|v| self.evaluate(v))
+            .unwrap_or(Ok(Value::Nil))?;
+        Err(Thrown::Return(to_return))
     }
 
     fn visit_var_stmt(&mut self, v: &stmt::Var) -> Result<()> {

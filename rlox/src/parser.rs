@@ -178,8 +178,8 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
     fn return_statement(&mut self, token: Token) -> Result<Stmt> {
         let return_value = if !self.check_next(&TokenKind::Semicolon) {
-            self.expression()?
-        } else { Expr::new_literal(value::Literal::Nil) };
+            Some(self.expression()?)
+        } else { None };
         self.consume(&TokenKind::Semicolon, "Expected ';' after return value.")?;
         Ok(Stmt::new_return(token, return_value))
     }

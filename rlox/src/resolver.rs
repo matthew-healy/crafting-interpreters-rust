@@ -19,6 +19,7 @@ enum FunctionType {
     None,
     Function,
     Method,
+    Init,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -136,7 +137,10 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
         );
 
         for method in c.methods.iter() {
-            self.resolve_function(&method, FunctionType::Method)?;
+            let declaration = if method.name.lexeme == "init" {
+                FunctionType::Init
+            } else { FunctionType::Method };
+            self.resolve_function(&method, declaration)?;
         }
 
         self.end_scope();
@@ -169,13 +173,19 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
     }
 
     fn visit_return_stmt(&mut self, r: &stmt::Return) -> Result<()> {
-        if self.current_function == FunctionType::None {
-            return Err(Error::static_analyzer(
+        match self.current_function {
+            FunctionType::None => Err(Error::static_analyzer(
                 r.keyword.clone(),
                 "Can't return from top-level code."
-            ))
+            )),
+            FunctionType::Init if r.value.is_some() => Err(Error::static_analyzer(
+                r.keyword.clone(),
+                "Cannot return a value from an initialiser."
+            )),
+            _ => r.value.as_ref()
+                    .map(|v| self.resolve_expr(v))
+                    .unwrap_or(Ok(()))
         }
-        self.resolve_expr(&r.value)
     }
 
     fn visit_var_stmt(&mut self, v: &stmt::Var) -> Result<()> {

@@ -32,6 +32,14 @@ impl <W: Write> Callable<W> for NativeFn<&'static dyn Fn() -> Value> {
     }
 }
 
+impl Function {
+    fn this_value(&self) -> interpreter::Result<Value> {
+        self.closure.borrow()
+            .maybe_get_at(0, "this")
+            .ok_or(Thrown::Error(Error::unexpected()))
+    }
+}
+
 impl <W: Write> Callable<W> for Function {
     fn arity(&self) -> usize {
         self.declaration.params.len()
@@ -47,11 +55,9 @@ impl <W: Write> Callable<W> for Function {
         }
 
         match interpreter.execute_block(&self.declaration.body, environment) {
-            Ok(_) if self.is_init =>
-                self.closure.borrow()
-                    .maybe_get_at(0, "this")
-                    .ok_or(Thrown::Error(Error::unexpected())),
+            Ok(_) if self.is_init => self.this_value(),
             Ok(()) => Ok(Value::Nil),
+            Err(interpreter::Thrown::Return(_)) if self.is_init => self.this_value(),
             Err(interpreter::Thrown::Return(v)) => Ok(v),
             Err(e) => Err(e),
         }
