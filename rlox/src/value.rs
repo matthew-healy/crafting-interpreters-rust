@@ -82,8 +82,12 @@ impl Value {
         Value::NativeFn(NativeFn { body })
     }
 
-    pub(crate) fn new_function(declaration: stmt::Function, closure: Rc<RefCell<Environment>>) -> Self {
-        Value::Function(Function::new(declaration, closure))
+    pub(crate) fn new_function(
+        declaration: stmt::Function,
+        closure: Rc<RefCell<Environment>>,
+        is_init: bool
+    ) -> Self {
+        Value::Function(Function::new(declaration, closure, is_init))
     }
 
     pub(crate) fn is_equal(&self, other: &Value) -> bool {
@@ -151,20 +155,22 @@ impl <F> PartialEq for NativeFn<F> {
 pub(crate) struct Function {
     pub(crate) declaration: stmt::Function,
     pub(crate) closure: Rc<RefCell<Environment>>,
+    pub(crate) is_init: bool,
 }
 
 impl Function {
-    pub(crate) fn new(declaration: stmt::Function, closure: Rc<RefCell<Environment>>) -> Self {
-        Self {
-            declaration,
-            closure,
-        }
+    pub(crate) fn new(declaration: stmt::Function, closure: Rc<RefCell<Environment>>, is_init: bool) -> Self {
+        Self { declaration, closure, is_init }
     }
 
     pub(crate) fn binding(&self, i: InstancePointer) -> Function {
         let mut env = Environment::from(&self.closure);
         env.define("this", Value::Instance(i));
-        Function { declaration: self.declaration.clone(), closure: Rc::new(RefCell::new(env)) }
+        Function {
+            declaration: self.declaration.clone(),
+            closure: Rc::new(RefCell::new(env)),
+            is_init: self.is_init
+        }
     }
 }
 

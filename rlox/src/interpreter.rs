@@ -125,7 +125,11 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
 
         let mut methods = HashMap::new();
         for method in c.methods.iter() {
-            let function = Value::new_function(method.clone(), Rc::clone(&self.environment));
+            let function = Value::new_function(
+                method.clone(),
+                Rc::clone(&self.environment),
+                method.name.lexeme == "init"
+            );
             methods.insert(method.name.lexeme.clone(), function);
         }
 
@@ -140,7 +144,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     }
 
     fn visit_function_stmt(&mut self, f: &stmt::Function) -> Result<()> {
-        let function = Value::new_function(f.clone(), Rc::clone(&self.environment));
+        let function = Value::new_function(f.clone(), Rc::clone(&self.environment), false);
         self.environment.borrow_mut().define(&f.name.lexeme, function);
         Ok(())
     }

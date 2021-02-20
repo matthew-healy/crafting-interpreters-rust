@@ -1,6 +1,7 @@
 use crate::{
+    error::Error,
     environment::Environment,
-    interpreter::{self, Interpreter},
+    interpreter::{self, Interpreter, Thrown},
     value::{ClassPointer, Function, NativeFn, Value},
 };
 use std::io::Write;
@@ -46,6 +47,10 @@ impl <W: Write> Callable<W> for Function {
         }
 
         match interpreter.execute_block(&self.declaration.body, environment) {
+            Ok(_) if self.is_init =>
+                self.closure.borrow()
+                    .maybe_get_at(0, "this")
+                    .ok_or(Thrown::Error(Error::unexpected())),
             Ok(()) => Ok(Value::Nil),
             Err(interpreter::Thrown::Return(v)) => Ok(v),
             Err(e) => Err(e),

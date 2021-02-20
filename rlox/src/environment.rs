@@ -34,25 +34,44 @@ impl Environment {
             })
     }
 
-    pub(crate) fn get_at(&mut self, distance: usize, name: &Token) -> Result<Value> {
+    pub(crate) fn maybe_get_at(&self, distance: usize, name: &str) -> Option<Value> {
+        self.with_ancestor_at(distance, |e| {
+            e.values.get(name).cloned()
+        })
+    }
+
+    pub(crate) fn get_at(&self, distance: usize, name: &Token) -> Result<Value> {
         self.with_ancestor_at(distance, |e| {
             e.values.get(&name.lexeme).cloned()
         }).ok_or_else(|| undefined_var_error(&name))
     }
 
     pub(crate) fn assign_at(&mut self, distance: usize, name: &Token, value: &Value) -> Result<()> {
-        self.with_ancestor_at(distance, |e| {
+        self.mutate_ancestor_at(distance, |e| {
             e.values.get_mut(&name.lexeme).map(|v| *v = value.clone())
         }).ok_or_else(|| undefined_var_error(&name))
     }
 
-    fn with_ancestor_at<T, F: Fn(&mut Environment) -> T>(&mut self, distance: usize, f: F) -> T {
+    fn mutate_ancestor_at<T, F: Fn(&mut Environment) -> T>(&mut self, distance: usize, f: F) -> T {
         match distance {
             0 => f(self),
             dist if self.enclosing.is_some() => {
                 self.enclosing.as_ref()
                     .unwrap()
                     .borrow_mut()
+                    .mutate_ancestor_at(dist - 1, f)
+            },
+            _ => unreachable!("Impossible scope. This is a static analysis bug.")
+        }
+    }
+
+    fn with_ancestor_at<T, F: Fn(&Environment) -> T>(&self, distance: usize, f: F) -> T {
+        match distance {
+            0 => f(self),
+            dist if self.enclosing.is_some() => {
+                self.enclosing.as_ref()
+                    .unwrap()
+                    .borrow()
                     .with_ancestor_at(dist - 1, f)
             },
             _ => unreachable!("Impossible scope. This is a static analysis bug.")
