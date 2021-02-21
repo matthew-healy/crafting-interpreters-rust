@@ -74,8 +74,8 @@ impl From<bool> for Value {
 }
 
 impl Value {
-    pub(crate) fn new_class<S: Into<String>>(name: S, fields: HashMap<String, Value>) -> Self {
-        Value::Class(ClassPointer::new(name.into(), fields))
+    pub(crate) fn new_class<S: Into<String>>(name: S, superclass: Option<ClassPointer>, fields: HashMap<String, Value>) -> Self {
+        Value::Class(ClassPointer::new(name.into(), superclass, fields))
     }
 
     pub(crate) fn new_native_fn(body: &'static dyn Fn() -> Value) -> Self {
@@ -183,6 +183,7 @@ impl fmt::Display for Function {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Class {
     pub(crate) name: String,
+    superclass: Option<ClassPointer>,
     fields: HashMap<String, Value>,
 }
 
@@ -190,8 +191,8 @@ pub(crate) struct Class {
 pub(crate) struct ClassPointer(Rc<RefCell<Class>>);
 
 impl ClassPointer {
-    fn new(name: String, fields: HashMap<String, Value>) -> Self {
-        let class = Class { name, fields };
+    fn new(name: String, superclass: Option<ClassPointer>, fields: HashMap<String, Value>) -> Self {
+        let class = Class { name, superclass, fields };
         Self(Rc::new(RefCell::new(class)))
     }
 

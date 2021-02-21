@@ -2,7 +2,7 @@ use std::iter::Peekable;
 
 use crate::{
     error::{Error, Result},
-    expr::{Expr},
+    expr::Expr,
     stmt::{self, Stmt},
     token::*,
     value,
@@ -75,6 +75,12 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
     fn class_declaration(&mut self) -> Result<Stmt> {
         let name = self.consume(&TokenKind::Identifier, "Expected class name.")?;
+
+        let superclass = if self.match_single(&TokenKind::Less).is_some() {
+            let name = self.consume(&TokenKind::Identifier, "Expected superclass name.")?;
+            Some(Expr::new_variable(name))
+        } else { None };
+
         self.consume(&TokenKind::LeftBrace, "Expected '{' before class body.")?;
 
         let mut methods = Vec::new();
@@ -84,7 +90,7 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
 
         self.consume(&TokenKind::RightBrace, "Expected '}' after class body.")?;
 
-        Ok(Stmt::new_class(name, methods))
+        Ok(Stmt::new_class(name, superclass, methods))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {

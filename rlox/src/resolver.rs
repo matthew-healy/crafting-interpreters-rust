@@ -131,6 +131,19 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
         self.declare(&c.name)?;
         self.define(&c.name);
 
+        if let Some(Expr::Variable(s)) = &c.superclass {
+            if c.name.lexeme == s.name.lexeme {
+                return Err(Error::static_analyzer(
+                    s.name.clone(),
+                    "A class may not inheret from itself."
+                ))
+            }
+        }
+
+        if let Some(superclass) = &c.superclass {
+            self.resolve_expr(superclass)?;
+        }
+
         self.begin_scope();
         self.scopes.last_mut().and_then(|s|
             s.insert("this".into(), VariableState::Defined)

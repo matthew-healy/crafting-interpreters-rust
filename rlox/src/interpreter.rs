@@ -120,6 +120,16 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
     }
 
     fn visit_class_stmt(&mut self, c: &stmt::Class) -> Result<()> {
+        let superclass = &c.superclass.as_ref()
+            .map(|s| self.evaluate(s))
+            .map(|s| {
+                match s {
+                    Ok(Value::Class(sup)) => Ok(sup),
+                    Ok(_) => Err(Thrown::Error(Error::runtime(c.name.clone(), "Superclass must be a class."))),
+                    Err(e) => Err(e),
+                }
+            }).transpose()?;
+
         let mut env = self.environment.borrow_mut();
         env.define(&c.name.lexeme, Value::Nil);
 
@@ -133,7 +143,7 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
             methods.insert(method.name.lexeme.clone(), function);
         }
 
-        let class = Value::new_class(&c.name.lexeme, methods);
+        let class = Value::new_class(&c.name.lexeme, superclass.clone(), methods);
         env.assign(&c.name, &class)?;
         Ok(())
     }
