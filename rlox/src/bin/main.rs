@@ -5,8 +5,10 @@ use rlox::{
     scanner::Scanner,
 };
 use std::{
+    cell::RefCell,
     env,
     io::{self, Write},
+    rc::Rc,
 };
 
 fn main() -> io::Result<()> {
@@ -53,14 +55,18 @@ fn run_prompt(out: &mut io::Stdout, err_out: &mut io::Stderr) -> io::Result<()> 
 }
 
 struct Lox<Out, ErrOut> {
-    interpreter: Interpreter<Out>,
+    interpreter: Rc<RefCell<Interpreter<Out>>>,
+    resolver: Resolver<Out>,
     err_out: ErrOut,
 }
 
 impl <Out: Write, ErrOut: Write> Lox<Out, ErrOut> {
     fn new(out: Out, err_out: ErrOut) -> Self {
+        let interpreter = Rc::new(RefCell::new(Interpreter::new(out)));
+        let resolver = Resolver::new(&interpreter);
         Self {
-            interpreter: Interpreter::new(out),
+            interpreter,
+            resolver,
             err_out,
         }
     }
@@ -90,12 +96,11 @@ impl <Out: Write, ErrOut: Write> Lox<Out, ErrOut> {
         }
         let statements: Vec<_> = statements.into_iter().map(Result::unwrap).collect();
 
-        let mut resolver = Resolver::new(&mut self.interpreter);
-        if let Err(e) = resolver.resolve_stmts(&statements) {
+        if let Err(e) = self.resolver.resolve_stmts(&statements) {
             return writeln!(self.err_out, "{}", e)
         }
 
-        match self.interpreter.interpret(&statements) {
+        match self.interpreter.borrow_mut().interpret(&statements) {
             Err(e) => {
                 writeln!(self.err_out, "{}", e)?;
                 std::process::exit(70)

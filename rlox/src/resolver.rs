@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::Rc
+};
 
 use crate::{
     interpreter::Interpreter, 
@@ -29,17 +33,17 @@ enum ClassType {
     Subclass,
 }
 
-pub struct Resolver<'a, W> {
-    interpreter: &'a mut Interpreter<W>,
+pub struct Resolver<W> {
+    interpreter: Rc<RefCell<Interpreter<W>>>,
     scopes: Vec<HashMap<String, VariableState>>,
     current_function: FunctionType,
     current_class: ClassType,
 }
 
-impl <'a, W> Resolver<'a, W> {
-    pub fn new(interpreter: &'a mut Interpreter<W>) -> Self {
+impl <W> Resolver<W> {
+    pub fn new(interpreter: &Rc<RefCell<Interpreter<W>>>) -> Self {
         Resolver {
-            interpreter,
+            interpreter: interpreter.clone(),
             scopes: vec![HashMap::new()],
             current_function: FunctionType::None,
             current_class: ClassType::None,
@@ -97,7 +101,7 @@ impl <'a, W> Resolver<'a, W> {
             .find(|s| s.1.contains_key(&n.lexeme));
 
         if let Some((idx, _)) = index_and_scope {
-            self.interpreter.resolve(e, idx);
+            self.interpreter.borrow_mut().resolve(e, idx);
         }
     }
 
@@ -117,7 +121,7 @@ impl <'a, W> Resolver<'a, W> {
     }
 }
 
-impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
+impl <W> stmt::Visitor<Result<()>> for Resolver<W> {
     fn visit_block_stmt(&mut self, b: &stmt::Block) -> Result<()> {
         self.begin_scope();
         self.resolve_stmts(&b.statements)?;
@@ -228,7 +232,7 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
     }
 }
 
-impl <'a, W> expr::Visitor<Result<()>> for Resolver<'a, W> {
+impl <W> expr::Visitor<Result<()>> for Resolver<W> {
     fn visit_assign_expr(&mut self, a: &expr::Assign) -> Result<()> {
         self.resolve_expr(&a.value)?;
         self.resolve_local(&Expr::Assign(a.clone()), &a.name);
