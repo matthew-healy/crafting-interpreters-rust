@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "rlox",
+    "rlox_treewalk",
     "astgen",
 ]

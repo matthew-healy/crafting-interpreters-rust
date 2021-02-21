@@ -1,4 +1,4 @@
-use rlox::{
+use rlox_treewalk::{
     interpreter::Interpreter,
     parser::Parser,
     resolver::Resolver,
