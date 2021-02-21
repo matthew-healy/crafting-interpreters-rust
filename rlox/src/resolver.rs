@@ -142,6 +142,11 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
 
         if let Some(superclass) = &c.superclass {
             self.resolve_expr(superclass)?;
+
+            self.begin_scope();
+            self.scopes.last_mut().and_then(|s|
+                s.insert("super".into(), VariableState::Defined)
+            );
         }
 
         self.begin_scope();
@@ -157,6 +162,11 @@ impl <'a, W> stmt::Visitor<Result<()>> for Resolver<'a, W> {
         }
 
         self.end_scope();
+
+        if c.superclass.is_some() {
+            self.end_scope();
+        }
+
         self.current_class = enclosing_class;
         Ok(())
     }
@@ -258,6 +268,11 @@ impl <'a, W> expr::Visitor<Result<()>> for Resolver<'a, W> {
     fn visit_set_expr(&mut self, e: &expr::Set) -> Result<()> {
         self.resolve_expr(&e.value)?;
         self.resolve_expr(&e.object)
+    }
+
+    fn visit_super_expr(&mut self, e: &expr::Super) -> Result<()> {
+        self.resolve_local(&Expr::Super(e.clone()), &e.keyword);
+        Ok(())
     }
 
     fn visit_this_expr(&mut self, e: &expr::This) -> Result<()> {

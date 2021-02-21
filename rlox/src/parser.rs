@@ -382,7 +382,12 @@ impl <T: Iterator<Item = Token>> Parser<Peekable<T>> {
             TokenKind::Nil => Ok(Expr::new_literal(value::Literal::Nil)),
             TokenKind::Number(n) => Ok(Expr::new_literal(n.into())),
             TokenKind::String(s) => Ok(Expr::new_literal(s.into())),
-            TokenKind::This => Ok(Expr::new_this(token)),
+            TokenKind::Super => {
+                self.consume(&TokenKind::Dot, "Expected '.' following 'super'.")?;
+                let field = self.consume(&TokenKind::Identifier, "Expected superclass field name.")?;
+                Ok(Expr::new_super(token, field))
+            },
+                TokenKind::This => Ok(Expr::new_this(token)),
             TokenKind::Identifier => Ok(Expr::new_variable(token)),
             TokenKind::LeftParen => {
                 let expression = Box::new(self.expression()?);

@@ -13,6 +13,7 @@ generate_ast!(
         Literal  => { value: value::Literal };
         Logical  => { left: Box<Expr>, op: Token, right: Box<Expr> };
         Set      => { object: Box<Expr>, name: Token, value: Box<Expr> };
+        Super    => { keyword: Token, method: Token };
         This     => { keyword: Token };
         Unary    => { op: Token, right: Box<Expr> };
         Variable => { name: Token };

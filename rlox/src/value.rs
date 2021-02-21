@@ -198,7 +198,9 @@ impl ClassPointer {
 
     pub(crate) fn get_field(&self, name: &str) -> Option<Value> {
         let class = self.0.borrow();
-        class.fields.get(name).map(|m| m.clone())
+        class.fields.get(name)
+            .cloned()
+            .or_else(|| class.superclass.as_ref().and_then(|s| s.get_field(name)))
     }
 
     pub(crate) fn instantiate(&self) -> InstancePointer {

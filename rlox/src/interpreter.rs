@@ -130,8 +130,16 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
                 }
             }).transpose()?;
 
-        let mut env = self.environment.borrow_mut();
-        env.define(&c.name.lexeme, Value::Nil);
+        {
+            let mut env = self.environment.borrow_mut();
+            env.define(&c.name.lexeme, Value::Nil);
+        }
+
+        if let Some(superclass) = superclass {
+            let mut new_env = Environment::from(&self.environment);
+            new_env.define("super", Value::Class(superclass.clone()));
+            self.environment = Rc::new(RefCell::new(new_env));
+        }
 
         let mut methods = HashMap::new();
         for method in c.methods.iter() {
@@ -144,7 +152,14 @@ impl <W: Write> stmt::Visitor<Result<()>> for Interpreter<W> {
         }
 
         let class = Value::new_class(&c.name.lexeme, superclass.clone(), methods);
-        env.assign(&c.name, &class)?;
+        if superclass.is_some() {
+            let enclosing = self.environment.borrow()
+                .enclosing.as_ref()
+                .map(Rc::clone)
+                .expect("Class with superclass must always have an enclosing environment. See L139-141.");
+            self.environment = enclosing;
+        }
+        self.environment.borrow_mut().assign(&c.name, &class)?;
         Ok(())
     }
 
@@ -312,6 +327,28 @@ impl <W: Write> expr::Visitor<Result<Value>> for Interpreter<W> {
                 "Only instances have properties."
             )))
         }
+    }
+
+    fn visit_super_expr(&mut self, e: &expr::Super) -> Result<Value> {
+        let super_instance_pair = self.locals.get(&Expr::Super(e.clone())).and_then(|dist| {
+            let env = self.environment.borrow();
+            let sc = env.maybe_get_at(*dist, "super");
+            let i = env.maybe_get_at(*dist - 1, "this");
+            match (sc, i) {
+                (Some(sc), Some(i)) => Some((sc, i)),
+                _ => None
+            }
+        });
+        if let Some((Value::Class(sup), Value::Instance(this))) = super_instance_pair {
+            if let Some(Value::Function(method)) = sup.get_field(&e.method.lexeme) {
+                Ok(Value::Function(method.binding(this)))
+            } else {
+                Err(Thrown::Error(Error::runtime(
+                    e.method.clone(),
+                    format!("Undefined property {}.", &e.method.lexeme)
+                )))
+            }
+        } else { unreachable!("super was set incorrectly. This is a static analysis bug.") }
     }
 
     fn visit_this_expr(&mut self, e: &expr::This) -> Result<Value> {

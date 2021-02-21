@@ -11,7 +11,7 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Environment {
-    enclosing: Option<Rc<RefCell<Environment>>>,
+    pub(crate) enclosing: Option<Rc<RefCell<Environment>>>,
     values: HashMap<String, Value>,
 }
 

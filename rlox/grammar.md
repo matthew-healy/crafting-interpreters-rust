@@ -10,7 +10,8 @@ function    -> IDENTIFIER "(" parameters? ")" block ;
 parameters  -> IDENTIFIER ( "," IDENTIFIER )* ;
 varDecl     -> "var" IDENTIFIER ( "=" expression )? ";" ;
 
-statement   -> exprStmt | forStmt | ifStmt | printStmt | returnStmt | whileStmt | block ;
+statement   -> exprStmt | forStmt | ifStmt | printStmt
+             | returnStmt | whileStmt | block ;
 exprStmt    -> expression ";" ;
 forStmt     -> "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
 ifStmt      -> "if" "(" expression ")" statement ( "else" statement )? ;
@@ -30,5 +31,7 @@ factor      -> unary ( ( "/"  | "*" ) unary )* ;
 unary       -> ( "!" | "-" -) unary | primary ;
 call        -> primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
 arguments   -> expression ( "," expression )* ;
-primary     -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
+primary     -> "true" | "false" | "nil" | "this"
+             | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+             | "super" "." IDENTIFIER ;
 ```
